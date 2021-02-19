@@ -27,11 +27,11 @@ class DBDiscord:
 		else:
 			raise TypeError("database_guild must be an int or guild object")
 		if not self.db.me.guild_permissions.administrator:
-			raise Warning("Warning: client does not have administrator permissions on database guild, CREATE and DROP operations will not be successful")
+			raise Warning("Warning: client does not have administrator permissions on database guild, CREATE and DROP operations may not be successful")
 
 	def use(self, name):
 		"""Changes the active database"""
-		if violates_str_rules(name) or " " in name:
+		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed use; illegal character")
 		for d in db.categories:
 			if d.name.lower() == name.lower():
@@ -41,7 +41,7 @@ class DBDiscord:
 
 	def create_database(self, name):
 		"""Creates a database and sets it to the active database"""
-		if violates_str_rules(name) or " " in name:
+		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
 		for d in db.categories:
 			if d.name.lower() == name.lower():
@@ -56,7 +56,7 @@ class DBDiscord:
 
 	def drop_database(self, name):
 		"""Drops the database"""
-		if violates_str_rules(name) or " " in name:
+		if violates_str_rules(name) or violates_name_rules(name) " " in name:
 			raise TypeError("Malformed drop; illegal character")
 		for d in db.categories:
 			if d.name.lower() == name.lower():
@@ -70,27 +70,38 @@ class DBDiscord:
 		"""Creates a table on the active database"""
 		if ad = None:
 			raise Exception("No active database")
-		if violates_str_rules(name) or " " in name:
+		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
 		if name.lower() == "master":
 			raise NameError("master is a reserved table name")
+
+		table_header = ""
+		for i in range(len(args)):
+			if not isinstance(args[i], str):
+				args[i] = str(args[i]) # cast all to string
+			if violates_str_rules(args[i]) or violates_name_rules(args[i]):
+				raise TypeError("Malformed create; illegal character")
+			col = args[i].split(" ", 1)
+			if len(col) == 1:
+				col.append("str")
+			if violates_datatype_rules(col[1]):
+				raise TypeError("Malformed create; illegal datatype")
+			table_header = table_header + str(col[0]) + " " + str(col[1]) + chr(0xDB)
+
 		mt = None
 		for t in ad.channels:
 			if t.name.lower() == name.lower():
 				raise NameError("Table with name already exists")
 			if t.name.lower() == ad.name.lower():
 				mt = t
-		await db.create_text_channel(name, category=ad, reason="DBDiscord: New Table")
-		await mt.send(name + char(0xDB))
-
-		# TODO: index table into mt
-		pass
+		new_table = await db.create_text_channel(name, category=ad, reason="DBDiscord: New Table")
+		await mt.send(new_table.id + chr(0xDB) + name + chr(0xDB) + table_header)
 
 	def drop_table(self, name):
 		"""Drops the table on the active database"""
 		if ad = None:
 			raise Exception("No active database")
-		if violates_str_rules(name) or " " in name:
+		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
 		if name.lower() == ad.name.lower():
 			raise NameError("Cannot drop table; illegal operation")
@@ -123,15 +134,21 @@ class DBDiscord:
 			if adstore == None:
 				raise NameError("No database with name: " + use)
 
+		headers = None
 		table = None
 		for t in ad.channels:
+			if t.name.lower() == ad.name.lower():
+				mt_records = await t.history(limit=1024).flatten()
+				for record in mt_records:
+					if ad.name.lower() == record.content.split(chr(0xDB))[2]:
+						headers = build_table_headers(record.content)
+						break
 			if t.name.lower() == against.lower():
 				table = t
-				break
 		if table == None:
 			raise NameError("No table with name: " + against)
 
-		rows = await table.history(limit=1024).flatten()
+		rawrows = await table.history(limit=1024).flatten()
 
 		# MORE CODE GOES HERE
 
@@ -150,10 +167,73 @@ class DBDiscord:
 		"""Upsert a row into a table"""
 		pass
 
+	# UTILS #
+
 	def violates_str_rules(self, *args):
 		for checkstr in args:
 			if not isinstance(checkstr, str):
 				raise TypeError("Argument must be a str")
-			if any(illegals in checkstr for illegals in [char(0xDB)]):
+			if any(illegals in checkstr for illegals in [chr(0xDB)]):
 				return True
 		return False
+
+	def violates_name_rules(self, *args):
+		for checkstr in args:
+			if not isinstance(checkstr, str):
+				raise TypeError("Argument must be a str")
+			if not checkstr.isalnum():
+				return True
+			if any(illegals in checkstr.lower() for illegals in ["select", "from", "where", "use", "create", "drop"])
+		return False
+
+	def violates_datatype_rules(self, *args):
+		valids = 0
+		for checkstr in args:
+			if not isinstance(checkstr, str):
+				raise TypeError("Argument must be a str")
+			if any(legals == checkstr.lower() for legals in ["int", "str", "float", "date"]):
+				valids += 1
+			if valids == len(args):
+				return True
+		return False
+
+	def build_table_headers(self, stream):
+		arr = stream.split(chr(0xDB))
+		headers = []
+		for i in range(len(arr)):
+			if i == 0:
+				headers.append(TableHeader(arr[i], pk=True))
+			else:
+				headers.append(TableHeader(arr[i]))
+		return headers
+
+class TableHeader:
+	def __init__(self, hstr, pk=False):
+		self.column_name = hstr.split(" ")[0]
+		self.datatype = "str"
+		try:
+			self.datatype  hstr.split(" ")[1]
+		except Exception as e:
+			pass
+		self.is_primary_key = pk
+
+class Table:
+	def __init__(self, table_name, header, rows):
+		self.table_name = table_name
+		self.rows = []
+		self.header = header
+		for i in range(len(headers)):
+			self.rows.append(TableRow(header[i], rows[i]))
+
+class TableRow:
+	def __init__(self, header, records):
+		self.header = header
+		self.row = []
+		record_raw = records.split(chr(0xDB))
+		for record in record_raw:
+			self.row.append(TableRecord(self.header.datatype, record))
+
+class TableRecord:
+	def __init__(self, datatype, data):
+		self.datatype = datatype
+		self.data = data
