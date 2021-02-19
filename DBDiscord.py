@@ -27,7 +27,7 @@ class DBDiscord:
 		else:
 			raise TypeError("database_guild must be an int or guild object")
 		if not self.db.me.guild_permissions.administrator:
-			raise Warning("Warning: client does not have administrator permissions on database guild")
+			raise Warning("Warning: client does not have administrator permissions on database guild, CREATE and DROP operations will not be successful")
 
 	def use(self, name):
 		"""Changes the active database"""
@@ -58,9 +58,13 @@ class DBDiscord:
 		"""Drops the database"""
 		if violates_str_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
-
-		# TODO: everything
-		pass
+		for d in db.categories:
+			if d.name.lower() == name.lower():
+				for t in d.channels:
+					await t.delete(reason="DBDiscord: Drop Database")
+				await d.delete(reason="DBDiscord: Drop Database")
+				return
+		raise NameError("Database with name does not exist")
 
 	def create_table(self, name, *args):
 		"""Creates a table on the active database"""
@@ -70,11 +74,16 @@ class DBDiscord:
 			raise TypeError("Malformed create; illegal character")
 		if name.lower() == "master":
 			raise NameError("master is a reserved table name")
+		mt = None
 		for t in ad.channels:
 			if t.name.lower() == name.lower():
 				raise NameError("Table with name already exists")
+			if t.name.lower() == ad.name.lower():
+				mt = t
+		await db.create_text_channel(name, category=ad, reason="DBDiscord: New Table")
+		await mt.send(name + char(0xDB))
 
-		# TODO: everything
+		# TODO: index table into mt
 		pass
 
 	def drop_table(self, name):
@@ -83,9 +92,13 @@ class DBDiscord:
 			raise Exception("No active database")
 		if violates_str_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
-
-		# TODO: everything
-		pass
+		if name.lower() == ad.name.lower():
+			raise NameError("Cannot drop table; illegal operation")
+		for t in ad.channels:
+			if t.name.lower() == name.lower():
+				t.delete(reason="DBDiscord: Drop Table")
+				return
+		raise NameError("Table with name does not exist")
 
 	def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
@@ -118,6 +131,8 @@ class DBDiscord:
 		if table == None:
 			raise NameError("No table with name: " + against)
 
+		rows = await table.history(limit=1024).flatten()
+
 		# MORE CODE GOES HERE
 
 		# cleanup
@@ -125,6 +140,14 @@ class DBDiscord:
 			ad = adstore
 
 		# TODO: return the results
+		pass
+
+	def insert_into(self, table, use="", *args):
+		"""Insert a row into a table"""
+		pass
+
+	def upsert_into(self, table use= "", *args):
+		"""Upsert a row into a table"""
 		pass
 
 	def violates_str_rules(self, *args):
