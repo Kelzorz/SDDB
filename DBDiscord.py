@@ -33,9 +33,9 @@ class DBDiscord:
 		"""Changes the active database"""
 		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed use; illegal character")
-		for d in db.categories:
+		for d in self.db.categories:
 			if d.name.lower() == name.lower():
-				ad = d
+				self.ad = d
 				return True
 		raise NameError("No database with name")
 
@@ -43,22 +43,22 @@ class DBDiscord:
 		"""Creates a database and sets it to the active database"""
 		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
-		for d in db.categories:
+		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				raise NameError("Database with name already exists")
 		overwrites = {
 		    guild.default_role: discord.PermissionOverwrite(read_messages=False),
 		    guild.me: discord.PermissionOverwrite(read_messages=True)
 		    }
-		self.ad = await db.create_category(name, overwrites=overwrites ,reason="DBDiscord: New Database")
-		await db.create_text_channel(name, category=ad, reason="DBDiscord: New Database")
+		self.ad = await self.db.create_category(name, overwrites=overwrites ,reason="DBDiscord: New Database")
+		await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Database")
 		return
 
 	def drop_database(self, name):
 		"""Drops the database"""
 		if violates_str_rules(name) or violates_name_rules(name) " " in name:
 			raise TypeError("Malformed drop; illegal character")
-		for d in db.categories:
+		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				for t in d.channels:
 					await t.delete(reason="DBDiscord: Drop Database")
@@ -68,7 +68,7 @@ class DBDiscord:
 
 	def create_table(self, name, *args):
 		"""Creates a table on the active database"""
-		if ad = None:
+		if self.ad == None:
 			raise Exception("No active database")
 		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
@@ -89,23 +89,23 @@ class DBDiscord:
 			table_header = table_header + str(col[0]) + " " + str(col[1]) + chr(0xDB)
 
 		mt = None
-		for t in ad.channels:
+		for t in self.ad.channels:
 			if t.name.lower() == name.lower():
 				raise NameError("Table with name already exists")
-			if t.name.lower() == ad.name.lower():
+			if t.name.lower() == self.ad.name.lower():
 				mt = t
-		new_table = await db.create_text_channel(name, category=ad, reason="DBDiscord: New Table")
+		new_table = await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Table")
 		await mt.send(new_table.id + chr(0xDB) + name + chr(0xDB) + table_header)
 
 	def drop_table(self, name):
 		"""Drops the table on the active database"""
-		if ad = None:
+		if self.ad == None:
 			raise Exception("No active database")
 		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
-		if name.lower() == ad.name.lower():
+		if name.lower() == self.ad.name.lower():
 			raise NameError("Cannot drop table; illegal operation")
-		for t in ad.channels:
+		for t in self.ad.channels:
 			if t.name.lower() == name.lower():
 				t.delete(reason="DBDiscord: Drop Table")
 				return
@@ -113,7 +113,7 @@ class DBDiscord:
 
 	def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
-		if ad = None:
+		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
 		if not isinstance(select, str) or not isinstance(against, str) or isinstance(where, str):
 			raise TypeError("Malformed query; unexpected datatype, str only")
@@ -124,23 +124,15 @@ class DBDiscord:
 		if against is "":
 			raise NameError("Malformed query; invalid FROM (AGAINST)")
 
-		adstore = None
-		if use is not "": # change ad pointer for this query
-			for d in db.categories:
-				if d.name.lower() == d.lower():
-					adstore = ad
-					ad = d
-					break
-			if adstore == None:
-				raise NameError("No database with name: " + use)
+		adstore = change_ad_pointer(use)
 
 		headers = None
 		table = None
-		for t in ad.channels:
-			if t.name.lower() == ad.name.lower():
+		for t in self.ad.channels:
+			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if ad.name.lower() == record.content.split(chr(0xDB))[2]:
+					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
 						headers = build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
@@ -149,21 +141,55 @@ class DBDiscord:
 			raise NameError("No table with name: " + against)
 
 		rawrows = await table.history(limit=1024).flatten()
+		full_table = Table(against, headers, rawrows)
+		match_table = Table(against, headers)
+		for row in full_table.rows:
+			pass # TODO: match the where clause and append to match_table
+
 
 		# MORE CODE GOES HERE
 
 		# cleanup
-		if adstore is not None: # restore ad pointer
-			ad = adstore
+		if adstore is not None:
+			change_ad_pointer(adstore)
 
-		# TODO: return the results
+		# TODO: return match table
 		pass
 
 	def insert_into(self, table, use="", *args):
 		"""Insert a row into a table"""
-		pass
+		if self.ad == None or (self.ad == None and use == ""):
+			raise Exception("No active database")
+		if not isinstance(table, str) or not isinstance(use, str):
+			raise TypeError("Malformed insert; table or use must be a str")
+		if violates_str_rules(table, use) or violates_name_rules(table, use):
+			raise TypeError("Malformed insert; illegal character")
 
-	def upsert_into(self, table use= "", *args):
+		adstore = None
+		change_ad_pointer(use)
+
+		for t in self.ad.channels:
+			if t.name.lower() == self.ad.name.lower():
+				mt_records = await t.history(limit=1024).flatten()
+				for record in mt_records:
+					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
+						headers = build_table_headers(record.content)
+						break
+			if t.name.lower() == against.lower():
+				table = t
+		if table == None:
+			raise NameError("No table with name: " + against)
+		if len(args) > len(headers):
+			raise Exception("Number of columns exceeds table definition")
+
+
+		# TODO: insert
+
+		# cleanup
+		if adstore is not None:
+			change_ad_pointer(adstore)
+
+	def upsert_into(self, table, use= "", *args):
 		"""Upsert a row into a table"""
 		pass
 
@@ -191,7 +217,7 @@ class DBDiscord:
 		for checkstr in args:
 			if not isinstance(checkstr, str):
 				raise TypeError("Argument must be a str")
-			if any(legals == checkstr.lower() for legals in ["int", "str", "float", "date"]):
+			if any(legals == checkstr.lower() for legals in ["str", "int", "float", "date"]):
 				valids += 1
 			if valids == len(args):
 				return True
@@ -207,6 +233,19 @@ class DBDiscord:
 				headers.append(TableHeader(arr[i]))
 		return headers
 
+	def change_ad_pointer(self, use):
+		adstore = None
+		if use != "": # change ad pointer for this operation
+			for d in self.db.categories:
+				if d.name.lower() == use.lower():
+					adstore = self.ad
+					self.ad = d
+					break
+			if adstore == None:
+				raise NameError("No database with name: " + use)
+			return adstore
+		return None
+
 class TableHeader:
 	def __init__(self, hstr, pk=False):
 		self.column_name = hstr.split(" ")[0]
@@ -218,22 +257,56 @@ class TableHeader:
 		self.is_primary_key = pk
 
 class Table:
-	def __init__(self, table_name, header, rows):
+	def __init__(self, table_name, headers, rows=None):
 		self.table_name = table_name
+		self.headers = headers
 		self.rows = []
-		self.header = header
-		for i in range(len(headers)):
-			self.rows.append(TableRow(header[i], rows[i]))
+		if rows is not None
+			for row in rows:
+				self.rows.append(TableRow(headers, row))
+
+	def __len__(self):
+		return len(self.headers)
+
+	def append(self, row):
+		if not isinstance(row, TableRow):
+			raise TypeError("row must be a TableRow object")
+		self.rows.append(row)
 
 class TableRow:
-	def __init__(self, header, records):
-		self.header = header
-		self.row = []
-		record_raw = records.split(chr(0xDB))
-		for record in record_raw:
-			self.row.append(TableRecord(self.header.datatype, record))
+	def __init__(self, headers, records):
+		self.headers = headers
+		self.columns = []
+		records_raw = records.split(chr(0xDB))
+		for i in range(len(self.headers)):
+			self.columns.append(TableRecord(self.headers[i], records_raw[i]))
+
+	def __len__(self):
+		return len(self.columns)
+
+	def append_column(self, data):
+		if len(self.columns) == len(self.headers):
+			raise Exception("Number of columns exceeds table definition")
+		self.columns.append(TableRecord(self.headers[len(self.columns)], data))
+
+	def update_column(self, index, data):
+		if not isinstance(index, int):
+			raise TypeError("index must be an int")
+		if index > len(self.headers) or index < 0:
+			raise IndexError("index out of bounds")
+		if self.headers[index].is_primary_key == True:
+			raise Exception("Cannot update primary key")
+		self.columns[index] = TableRecord(headers[index], data)
 
 class TableRecord:
 	def __init__(self, datatype, data):
 		self.datatype = datatype
 		self.data = data
+		if datatype == "str":
+			return
+		elif datatype == "int":
+			self.data = int(data)
+		elif datatype == "float":
+			self.data = float(data)
+		elif datatype == "date":
+			self.data = datetime(data)
