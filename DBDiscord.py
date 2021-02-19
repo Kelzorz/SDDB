@@ -5,13 +5,15 @@ from datetime import datetime
 # The █ character (0xDB) is used as a global delimiter, and is not allowed under any circumstances.
 # A database is identified as a channel category in the Discord guild.
 # - Databases can have multiple tables
+# - Each Database has a master table that maps fields for each table in th database
 # A table is identified as a text channel in the Discord guild.
-# - Tables have columns as defined in the text channel with the same name as the DB delimitated by the 0xDB character.
+# - Tables have columns as defined by it's record in the master table delimitated by the 0xDB character.
 # A row is identified as a text message in a text channel in the Discord guild.
-# - Rows columns are delimitated by the 0xDB character. 
-# from is a Python keyword and cannot be used as a variable, against is used instead.
+# - Row columns are delimitated by the 0xDB character.
+# - Primary key is the message id.
+# "from" is a Python keyword and cannot be used as a variable, "against" is used instead for SQL-like syntax.
 
-class DBDiscord:
+class DBMS:
 	def __init__(self, discord_client, database_guild):
 		if not isinstance(discord_client, discord.Client):
 			raise TypeError("discord_client must be a discord.Client")
@@ -156,7 +158,7 @@ class DBDiscord:
 		# TODO: return match table
 		pass
 
-	def insert_into(self, table, use="", *args):
+	def insert_into(self, table, **kwargs, use=""):
 		"""Insert a row into a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
@@ -168,6 +170,7 @@ class DBDiscord:
 		adstore = None
 		change_ad_pointer(use)
 
+		insert_table = None
 		for t in self.ad.channels:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
@@ -175,15 +178,22 @@ class DBDiscord:
 					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
 						headers = build_table_headers(record.content)
 						break
-			if t.name.lower() == against.lower():
-				table = t
-		if table == None:
+			if t.name.lower() == table.lower():
+				insert_table = t
+		if insert_table == None:
 			raise NameError("No table with name: " + against)
 		if len(args) > len(headers):
 			raise Exception("Number of columns exceeds table definition")
-
-
-		# TODO: insert
+		new_row = TableRow(headers)
+		for field in kwargs:
+			valid_field = False
+			for i in range(len(headers)):
+				if field.lower() == headers[i].column_name.lower():
+					new_row.update_record(i, kwargs[field])
+					valid_field = True
+			if not valid_field:
+				raise NameError("No field \"" + field + "\" exists on table")
+		await insert_table.send(str(new_row))
 
 		# cleanup
 		if adstore is not None:
@@ -268,35 +278,54 @@ class Table:
 	def __len__(self):
 		return len(self.headers)
 
+	def __str__(self):
+		rs = "table_name: " + self.table_name + "\n\n"
+		for header in self.headers:
+			rs += header.column_name + " " + header.datatype + chr(0xDB)
+		for row in self.rows:
+			rs += "\n" + str(row)
+
 	def append(self, row):
 		if not isinstance(row, TableRow):
 			raise TypeError("row must be a TableRow object")
 		self.rows.append(row)
 
 class TableRow:
-	def __init__(self, headers, records):
+	def __init__(self, headers, records=None):
 		self.headers = headers
-		self.columns = []
-		records_raw = records.split(chr(0xDB))
-		for i in range(len(self.headers)):
-			self.columns.append(TableRecord(self.headers[i], records_raw[i]))
+		self.records = []
+		if records is not None:
+			records_raw = records.split(chr(0xDB))
+			if not len(records_raw) == len(self.headers):
+				raise Exception("Number of records do not match expected headers")
+			for i in range(len(self.headers)):
+				self.records.append(TableRecord(self.headers[i], records_raw[i]))
+		else:
+			for i in range(len(self.headers)):
+				self.records.append(TableRecord(self.headers[i], "NULL"))
 
 	def __len__(self):
-		return len(self.columns)
+		return len(self.records)
 
-	def append_column(self, data):
-		if len(self.columns) == len(self.headers):
+	def __str__(self):
+		rs = ""
+		for record in self.records:
+			rs += str(record.data) += chr(0xDB)
+		return rs
+
+	def append_record(self, data):
+		if len(self.records) == len(self.headers):
 			raise Exception("Number of columns exceeds table definition")
-		self.columns.append(TableRecord(self.headers[len(self.columns)], data))
+		self.records.append(TableRecord(self.headers[len(self.records)], data))
 
-	def update_column(self, index, data):
+	def update_record(self, index, data):
 		if not isinstance(index, int):
 			raise TypeError("index must be an int")
 		if index > len(self.headers) or index < 0:
 			raise IndexError("index out of bounds")
 		if self.headers[index].is_primary_key == True:
 			raise Exception("Cannot update primary key")
-		self.columns[index] = TableRecord(headers[index], data)
+		self.records[index] = TableRecord(headers[index], data)
 
 class TableRecord:
 	def __init__(self, datatype, data):
