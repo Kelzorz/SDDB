@@ -76,6 +76,8 @@ class DBMS:
 			raise TypeError("Malformed create; illegal character")
 		if name.lower() == "master":
 			raise NameError("master is a reserved table name")
+		if len(self.ad.channels) == 1024:
+			raise Exception("Maximum number of tables reached; 1024")
 
 		table_header = ""
 		for i in range(len(args)):
@@ -107,11 +109,20 @@ class DBMS:
 			raise TypeError("Malformed drop; illegal character")
 		if name.lower() == self.ad.name.lower():
 			raise NameError("Cannot drop table; illegal operation")
+		table = None
+		master_table = None
 		for t in self.ad.channels:
 			if t.name.lower() == name.lower():
-				t.delete(reason="DBDiscord: Drop Table")
-				return
-		raise NameError("Table with name does not exist")
+				table = t
+			if t.name.lower() == self.ad.name():
+				master_table = t
+		if table == None:
+			raise NameError("Table with name does not exist")
+		for record in master_table.history(limit=1024).flatten():
+			if record.content.lower().split(chr(0xDB)[0] == table.name.lower()):
+				await.record.delete()
+				break
+		await table.delete(reason="DBDiscord: Drop Table")
 
 	def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
@@ -184,6 +195,8 @@ class DBMS:
 			raise NameError("No table with name: " + against)
 		if len(kwargs) > len(headers):
 			raise Exception("Number of columns exceeds table definition")
+		if len(await table.history(limit=1024).flatten()) == 1024:
+			raise Exception("Maximum number of records reached; 1024")
 
 		new_row = TableRow(headers)
 		for field in kwargs:
@@ -264,7 +277,7 @@ class DBMS:
 			if not checkstr.isalnum():
 				return True
 			for substr in checkstr.split(" "):
-				if any(illegals in substr.lower() for illegals in ["select", "from", "where", "use", "create", "drop", "delete", "in"]):
+				if any(illegals in substr.lower() for illegals in ["select", "from", "against", "where", "use", "create", "drop", "delete", "and", "or", "in"]):
 				return True
 		return False
 
