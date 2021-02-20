@@ -158,19 +158,19 @@ class DBMS:
 		# TODO: return match table
 		pass
 
-	def insert_into(self, table, **kwargs, use=""):
+	def insert_into(self, against, **kwargs, use=""):
 		"""Insert a row into a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
-		if not isinstance(table, str) or not isinstance(use, str):
+		if not isinstance(against, str) or not isinstance(use, str):
 			raise TypeError("Malformed insert; table or use must be a str")
-		if violates_str_rules(table, use) or violates_name_rules(table, use):
+		if violates_str_rules(against, use) or violates_name_rules(against, use):
 			raise TypeError("Malformed insert; illegal character")
 
 		adstore = None
 		change_ad_pointer(use)
 
-		insert_table = None
+		table = None
 		for t in self.ad.channels:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
@@ -178,12 +178,13 @@ class DBMS:
 					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
 						headers = build_table_headers(record.content)
 						break
-			if t.name.lower() == table.lower():
-				insert_table = t
-		if insert_table == None:
+			if t.name.lower() == against.lower():
+				table = t
+		if table == None:
 			raise NameError("No table with name: " + against)
-		if len(args) > len(headers):
+		if len(kwargs) > len(headers):
 			raise Exception("Number of columns exceeds table definition")
+
 		new_row = TableRow(headers)
 		for field in kwargs:
 			valid_field = False
@@ -193,14 +194,57 @@ class DBMS:
 					valid_field = True
 			if not valid_field:
 				raise NameError("No field \"" + field + "\" exists on table")
-		await insert_table.send(str(new_row))
+		await table.send(str(new_row))
 
 		# cleanup
 		if adstore is not None:
 			change_ad_pointer(adstore)
 
-	def upsert_into(self, table, use= "", *args):
-		"""Upsert a row into a table"""
+	def update(self, against, **kwargs, where="", use=""):
+		"""Update a row in a table"""
+		if self.ad == None or (self.ad == None and use == ""):
+			raise Exception("No active database")
+		if not isinstance(against, str) or not isinstance(use, str):
+			raise TypeError("Malformed update; table or use must be a str")
+		if violates_str_rules(against, use) or violates_name_rules(against, use):
+			raise TypeError("Malformed update; illegal character")
+
+		adstore = None
+		change_ad_pointer(use)
+
+		table = None
+		for t in self.ad.channels:
+			if t.name.lower() == self.ad.name.lower():
+				mt_records = await t.history(limit=1024).flatten()
+				for record in mt_records:
+					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
+						headers = build_table_headers(record.content)
+						break
+			if t.name.lower() == against.lower():
+				table = t
+		if table == None:
+			raise NameError("No table with name: " + against)
+		if len(kwargs) > len(headers):
+			raise Exception("Number of columns exceeds table definition")
+
+		all_rows = await table.history(limit=1024).flatten()
+		matching_rows = []
+		for row in all_rows:
+			pass # TODO: match where clause to rows	
+
+		# new_row = TableRow(headers)
+		# for field in kwargs:
+		# 	valid_field = False
+		# 	for i in range(len(headers)):
+		# 		if field.lower() == headers[i].column_name.lower():
+		# 			new_row.update_record(i, kwargs[field])
+		# 			valid_field = True
+		# 	if not valid_field:
+		# 		raise NameError("No field \"" + field + "\" exists on table")
+		pass
+
+	def delete(self, against, where):
+		"""Delete row(s) in a table"""
 		pass
 
 	# UTILS #
@@ -219,7 +263,9 @@ class DBMS:
 				raise TypeError("Argument must be a str")
 			if not checkstr.isalnum():
 				return True
-			if any(illegals in checkstr.lower() for illegals in ["select", "from", "where", "use", "create", "drop"])
+			for substr in checkstr.split(" "):
+				if any(illegals in substr.lower() for illegals in ["select", "from", "where", "use", "create", "drop", "delete", "in"]):
+				return True
 		return False
 
 	def violates_datatype_rules(self, *args):
@@ -237,10 +283,7 @@ class DBMS:
 		arr = stream.split(chr(0xDB))
 		headers = []
 		for i in range(len(arr)):
-			if i == 0:
-				headers.append(TableHeader(arr[i], pk=True))
-			else:
-				headers.append(TableHeader(arr[i]))
+			headers.append(TableHeader(arr[i]))
 		return headers
 
 	def change_ad_pointer(self, use):
