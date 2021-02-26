@@ -1,4 +1,5 @@
 import discord
+from enum import Enum
 from datetime import datetime
 
 # DBDiscord uses a Discord guild as a ghetto database and supports simple DB operations - create, select, update, delete.
@@ -128,7 +129,7 @@ class DBMS:
 		"""Queries the active database"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
-		if not isinstance(select, str) or not isinstance(against, str) or isinstance(where, str):
+		if not isinstance(select, str) or not isinstance(against, str) or isinstance(use, str) or isinstance(where, str):
 			raise TypeError("Malformed query; unexpected datatype, str only")
 		if violates_str_rules(select, against, where, use):
 			raise TypeError("Malformed query; illegal character")
@@ -217,9 +218,9 @@ class DBMS:
 		"""Update a row in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
-		if not isinstance(against, str) or not isinstance(use, str):
+		if not isinstance(against, str) or not isinstance(use, str) or not isinstance(where, str):
 			raise TypeError("Malformed update; table or use must be a str")
-		if violates_str_rules(against, use) or violates_name_rules(against, use):
+		if violates_str_rules(against, use, where) or violates_name_rules(against, use):
 			raise TypeError("Malformed update; illegal character")
 
 		adstore = None
@@ -239,11 +240,12 @@ class DBMS:
 			raise NameError("No table with name: " + against)
 		if len(kwargs) > len(headers):
 			raise Exception("Number of columns exceeds table definition")
+		# TODO: make sure **kwargs does not violate rules
 
 		all_rows = await table.history(limit=1024).flatten()
 		matching_rows = []
 		for row in all_rows:
-			pass # TODO: match where clause to rows	
+			pass # TODO: match where clause to rows	and update matched records
 
 		# new_row = TableRow(headers)
 		# for field in kwargs:
@@ -254,13 +256,71 @@ class DBMS:
 		# 			valid_field = True
 		# 	if not valid_field:
 		# 		raise NameError("No field \"" + field + "\" exists on table")
+
+		# cleanup
+		if adstore is not None:
+			change_ad_pointer(adstore)
 		pass
 
-	def delete(self, against, where):
+	def delete(self, against, where, use=""):
 		"""Delete row(s) in a table"""
+		if self.ad == None or (self.ad == None and use == ""):
+			raise Exception("No active database")
+		if not isinstance(against, str) or not isinstance(use, str) or not isinstance(where, str):
+			raise TypeError("Malformed delete; table or use must be a str")
+		if violates_str_rules(against, use, where) or violates_name_rules(against, use):
+			raise TypeError("Malformed delete; illegal character")
+
+		adstore = None
+		change_ad_pointer(use)
+
+		table = None
+		for t in self.ad.channels:
+			if t.name.lower() == self.ad.name.lower():
+				mt_records = await t.history(limit=1024).flatten()
+				for record in mt_records:
+					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
+						headers = build_table_headers(record.content)
+						break
+			if t.name.lower() == against.lower():
+				table = t
+		if table == None:
+			raise NameError("No table with name: " + against)
+		if len(kwargs) > len(headers):
+			raise Exception("Number of columns exceeds table definition")
+
+		# TODO: match where clause to rows and delete
+
+		# cleanup
+		if adstore is not None:
+			change_ad_pointer(adstore)
 		pass
 
 	# UTILS #
+
+	class Clause:
+		"""Wrapper for where clause"""
+		class OPTYPE(Enum):
+			EQ = 0
+			LESS = 1
+			GREATER = 2
+			LESSEQ = 3
+			GREATEREQ = 4
+
+		def __init__(self, field, optype, value):
+			self.field = field
+			self.optype = optype
+			self.value = value
+
+	def match_where(self, clause):
+		if not isinstance(clause, str):
+			raise TypeError("where clause must be a str")
+		pass # where matching algorithm goes here
+
+	def parse_where(self, clause):
+		if not isinstance(clause, str):
+			raise TypeError("where clause must be a str")
+		pass # parse multiple where clause into a list of clauses
 
 	def violates_str_rules(self, *args):
 		for checkstr in args:
