@@ -1,4 +1,5 @@
 import discord
+import re
 from enum import Enum
 from datetime import datetime
 
@@ -302,46 +303,104 @@ class DBMS:
 		"""Wrapper for where clause"""
 		class OPTYPE(Enum):
 			EQ = 0
-			LESS = 1
-			GREATER = 2
-			LESSEQ = 3
-			GREATEREQ = 4
+			NOT = 1
+			LESS = 2
+			GREATER = 3
+			LESSEQ = 4
+			GREATEREQ = 5
 
-		def __init__(self, field, optype, value, datatype=None):
+		def __init__(self, field, optype, value):
 			self.field = field
 			self.optype = optype
 			self.value = value
-			self.datatype = datatype
 
-	def match_where(self, clause):
-		if not isinstance(clause, str):
-			raise TypeError("where clause must be a str")
-		pass # where matching algorithm goes here
+	def match_where(self, clause, row):
+		"""Checks if a row matches a where clause"""
+		if not isinstance(clause, list):
+			raise TypeError("where clause must be list of Clause")
+		if not isinstance(row, TableRow):
+			raise TypeError("row must be an instance of TableRow")
+		if not isinstance(clause, Clause):
+			raise TypeError("where clause must be list of Clause")
+			for i in range(len(row.headers)):
+				if clause.field.lower() == row.headers[i].column_name.lower():
+					if row.headers[i].datatype == "str":
+						if clause.optype == LESS or clause.optype == GREATER or clause.optype == LESSEQ or clause.optype == GREATEREQ:
+							raise TypeError("Malformed where clause; cannot preform numerical comparison operation on string")
+					if row.headers[i].datatype == "int":
+						clause.value = int(clause.value)
+					if row.headers[i].datatype == "float":
+						clause.value = float(clause.value)
+					if row.headers[i].datatype == "date":
+						clause.value = datetime.strptime(clause.value)
+
+					if clause.optype == EQ:
+						if clause.value == row.records[i].data:
+							return True
+						return False
+					if clause.optype == NOT:
+						if clause.value != row.records[i].data:
+							return True
+						return False
+					if clause.optype == LESS:
+						if clause.value < row.records[i].data:
+							return True
+						return False
+					if clause.optype == GREATER:
+						if clause.value > row.records[i].data:
+							return True
+						return False
+					if clause.optype == LESSEQ:
+						if clause.value <= row.records[i].data:
+							return True
+						return False
+					if clause.optype == GREATEREQ:
+						if clause.value >= row.records[i].data:
+							return True
+						return False
 
 	def parse_where(self, clause):
 		"""Returns a list of Clause"""
 		if not isinstance(clause, str):
 			raise TypeError("where clause must be a str")
 
-		sc = clause.split(">=", 1)
+		sc = re.split(">=|=>", clause, maxsplit=1)
 		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
 			return [Clause(sc[0], OPTYPE.GREATEREQ, sc[1])]
-		sc = clause.split("<=", 1)
+		sc = re.split("<=|=<", clause, maxsplit=1)
 		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
 			return [Clause(sc[0], OPTYPE.LESSEQ, sc[1])]
 		sc = clause.split(">", 1)
 		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
 			return [Clause(sc[0], OPTYPE.GREATER, sc[1])]
 		sc = clause.split("<", 1)
 		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
 			return [Clause(sc[0], OPTYPE.LESS, sc[1])]
+		sc = re.split("!=|=!", clause, maxsplit=1)
+		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
+			return [Clause(sc[0], OPTYPE.NOT, sc[1])]
 		sc = clause.split("==", 1)
 		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
 			return [Clause(sc[0], OPTYPE.EQ, sc[1])]
 		sc = clause.split("=", 1)
 		if len(sc) > 1:
+			sc[0] = sc[0].strip()
+			sc[1] = sc[1].strip()
 			return [Clause(sc[0], OPTYPE.EQ, sc[1])]
 
+		raise Exception("Unable to parse query; malformed where clause")
 		pass # TODO: support and/or operations for multiple clauses
 
 	def violates_str_rules(self, *args):
@@ -468,7 +527,7 @@ class TableRow:
 			raise IndexError("index out of bounds")
 		if self.headers[index].is_primary_key == True:
 			raise Exception("Cannot update primary key")
-		self.records[index] = TableRecord(headers[index], data)
+		self.records[index] = TableRecord(headers[index], data.strip())
 
 class TableRecord:
 	def __init__(self, datatype, data):
