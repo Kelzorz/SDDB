@@ -24,7 +24,7 @@ class DBMS:
 		self.ad = None # Active database pointer
 		if isinstance(database_guild, discord.Guild):
 			self.db = database_guild
-		elif isinstance(database_guild, int)
+		elif isinstance(database_guild, int):
 			self.db = d.get_guild(database_guild)
 			if self.db is None:
 				raise Exception("guild does not exist: " + str(database_guild))
@@ -43,7 +43,7 @@ class DBMS:
 				return True
 		raise NameError("No database with name")
 
-	def create_database(self, name):
+	async def create_database(self, name):
 		"""Creates a database and sets it to the active database"""
 		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
@@ -58,9 +58,9 @@ class DBMS:
 		await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Database")
 		return
 
-	def drop_database(self, name):
+	async def drop_database(self, name):
 		"""Drops the database"""
-		if violates_str_rules(name) or violates_name_rules(name) " " in name:
+		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
@@ -70,7 +70,7 @@ class DBMS:
 				return
 		raise NameError("Database with name does not exist")
 
-	def create_table(self, name, *args):
+	async def create_table(self, name, *args):
 		"""Creates a table on the active database"""
 		if self.ad == None:
 			raise Exception("No active database")
@@ -103,7 +103,7 @@ class DBMS:
 		new_table = await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Table")
 		await mt.send(new_table.id + chr(0xDB) + name + chr(0xDB) + table_header)
 
-	def drop_table(self, name):
+	async def drop_table(self, name):
 		"""Drops the table on the active database"""
 		if self.ad == None:
 			raise Exception("No active database")
@@ -122,11 +122,11 @@ class DBMS:
 			raise NameError("Table with name does not exist")
 		for record in master_table.history(limit=1024).flatten():
 			if record.content.lower().split(chr(0xDB)[0] == table.name.lower()):
-				await.record.delete()
+				await record.delete()
 				break
 		await table.delete(reason="DBDiscord: Drop Table")
 
-	def query(self, select="*", against="", where="", use=""):
+	async def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
@@ -172,7 +172,7 @@ class DBMS:
 
 		return match_table
 
-	def insert_into(self, against, **kwargs, use=""):
+	async def insert_into(self, against, use="", **kwargs):
 		"""Insert a row into a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
@@ -216,7 +216,7 @@ class DBMS:
 		if adstore is not None:
 			change_ad_pointer(adstore)
 
-	def update(self, against, **kwargs, where="", use=""):
+	async def update(self, against, where="", use="", **kwargs):
 		"""Update a row in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
@@ -276,7 +276,7 @@ class DBMS:
 		if adstore is not None:
 			change_ad_pointer(adstore)
 
-	def delete(self, against, where, use=""):
+	async def delete(self, against, where, use=""):
 		"""Delete row(s) in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
@@ -455,7 +455,7 @@ class DBMS:
 				return True
 			for substr in checkstr.split(" "):
 				if any(illegals in substr.lower() for illegals in ["select", "from", "against", "where", "use", "create", "drop", "delete", "and", "or", "in"]):
-				return True
+					return True
 		return False
 
 	def violates_datatype_rules(self, *args):
@@ -499,7 +499,7 @@ class TableHeader:
 		self.column_name = hstr.split(" ")[0]
 		self.datatype = "str"
 		try:
-			self.datatype  hstr.split(" ")[1]
+			self.datatype = hstr.split(" ")[1]
 		except Exception as e:
 			pass
 		self.is_primary_key = pk
@@ -509,7 +509,7 @@ class Table:
 		self.table_name = table_name
 		self.headers = headers
 		self.rows = []
-		if rows is not None
+		if rows is not None:
 			for row in rows:
 				self.rows.append(TableRow(headers, row))
 
@@ -548,7 +548,7 @@ class TableRow:
 	def __str__(self):
 		rs = ""
 		for record in self.records:
-			rs += str(record.data) += chr(0xDB)
+			rs += str(record.data) + chr(0xDB)
 		return rs
 
 	def append_record(self, data):
