@@ -307,10 +307,11 @@ class DBMS:
 			LESSEQ = 3
 			GREATEREQ = 4
 
-		def __init__(self, field, optype, value):
+		def __init__(self, field, optype, value, datatype=None):
 			self.field = field
 			self.optype = optype
 			self.value = value
+			self.datatype = datatype
 
 	def match_where(self, clause):
 		if not isinstance(clause, str):
@@ -318,9 +319,30 @@ class DBMS:
 		pass # where matching algorithm goes here
 
 	def parse_where(self, clause):
+		"""Returns a list of Clause"""
 		if not isinstance(clause, str):
 			raise TypeError("where clause must be a str")
-		pass # parse multiple where clause into a list of clauses
+
+		sc = clause.split(">=", 1)
+		if len(sc) > 1:
+			return [Clause(sc[0], OPTYPE.GREATEREQ, sc[1])]
+		sc = clause.split("<=", 1)
+		if len(sc) > 1:
+			return [Clause(sc[0], OPTYPE.LESSEQ, sc[1])]
+		sc = clause.split(">", 1)
+		if len(sc) > 1:
+			return [Clause(sc[0], OPTYPE.GREATER, sc[1])]
+		sc = clause.split("<", 1)
+		if len(sc) > 1:
+			return [Clause(sc[0], OPTYPE.LESS, sc[1])]
+		sc = clause.split("==", 1)
+		if len(sc) > 1:
+			return [Clause(sc[0], OPTYPE.EQ, sc[1])]
+		sc = clause.split("=", 1)
+		if len(sc) > 1:
+			return [Clause(sc[0], OPTYPE.EQ, sc[1])]
+
+		pass # TODO: support and/or operations for multiple clauses
 
 	def violates_str_rules(self, *args):
 		for checkstr in args:
@@ -346,7 +368,7 @@ class DBMS:
 		for checkstr in args:
 			if not isinstance(checkstr, str):
 				raise TypeError("Argument must be a str")
-			if any(legals == checkstr.lower() for legals in ["str", "int", "float", "date"]):
+			if any(legals == checkstr.lower() for legals in ["str", "num", "date", "int", "float"]):
 				valids += 1
 			if valids == len(args):
 				return True
@@ -371,6 +393,11 @@ class DBMS:
 				raise NameError("No database with name: " + use)
 			return adstore
 		return None
+
+class DATATYPE(Enum): # TODO: use this instead of strings
+	STR = 0
+	NUM = 1
+	DATE = 2
 
 class TableHeader:
 	def __init__(self, hstr, pk=False):
