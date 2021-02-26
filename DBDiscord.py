@@ -158,18 +158,19 @@ class DBMS:
 		rawrows = await table.history(limit=1024).flatten()
 		full_table = Table(against, headers, rawrows)
 		match_table = Table(against, headers)
+		clauses = parse_where(where)
 		for row in full_table.rows:
-			pass # TODO: match the where clause and append to match_table
+			for clause in clauses: # TODO: this will need to be changed to support and/or operators
+				if match_where(clause, row):
+					match_table.append(row)
 
-
-		# MORE CODE GOES HERE
+		# MORE CODE GOES HERE?
 
 		# cleanup
 		if adstore is not None:
 			change_ad_pointer(adstore)
 
-		# TODO: return match table
-		pass
+		return match_table
 
 	def insert_into(self, against, **kwargs, use=""):
 		"""Insert a row into a table"""
@@ -228,6 +229,7 @@ class DBMS:
 		change_ad_pointer(use)
 
 		table = None
+		headers = None
 		for t in self.ad.channels:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
@@ -241,27 +243,38 @@ class DBMS:
 			raise NameError("No table with name: " + against)
 		if len(kwargs) > len(headers):
 			raise Exception("Number of columns exceeds table definition")
-		# TODO: make sure **kwargs does not violate rules
 
-		all_rows = await table.history(limit=1024).flatten()
-		matching_rows = []
-		for row in all_rows:
-			pass # TODO: match where clause to rows	and update matched records
+		# generate row objects from raw
+		raw_rows = await table.history(limit=1024).flatten()
+		rows = []
+		for raw in raw_rows:
+			tr = TableRow(headers)
+			for data in raw_rows.content.split(chr(0xDB)):
+				tr.append_record(data)
+			rows.append(tr)
+		
+		clauses = parse_where(where)
+		for i in range(len(rows)):
+			for clause in clauses: # TODO: this will need to be changed to support and/or operators
+				if match_where(clause, rows[i]):
+					for field in kwargs:
+						valid_field = False
+						for i in range(len(headers)):
+							if field.lower() == headers[i].column_name.lower():
+								rows[i].update_record(i, kwargs[field])
+								valid_field = True
+						if not valid_field:
+							raise NameError("No field \"" + field + "\" exists on table")
+				else:
+					rows[i] = None
 
-		# new_row = TableRow(headers)
-		# for field in kwargs:
-		# 	valid_field = False
-		# 	for i in range(len(headers)):
-		# 		if field.lower() == headers[i].column_name.lower():
-		# 			new_row.update_record(i, kwargs[field])
-		# 			valid_field = True
-		# 	if not valid_field:
-		# 		raise NameError("No field \"" + field + "\" exists on table")
+		for i in range(len(rows)):
+			if rows[i] is not None:
+				await raw_rows[i].edit(content=str(rows[i]))
 
 		# cleanup
 		if adstore is not None:
 			change_ad_pointer(adstore)
-		pass
 
 	def delete(self, against, where, use=""):
 		"""Delete row(s) in a table"""
@@ -287,10 +300,33 @@ class DBMS:
 				table = t
 		if table == None:
 			raise NameError("No table with name: " + against)
-		if len(kwargs) > len(headers):
-			raise Exception("Number of columns exceeds table definition")
 
-		# TODO: match where clause to rows and delete
+		# generate row objects from raw
+		raw_rows = await table.history(limit=1024).flatten()
+		rows = []
+		for raw in raw_rows:
+			tr = TableRow(headers)
+			for data in raw_rows.content.split(chr(0xDB)):
+				tr.append_record(data)
+			rows.append(tr)
+		
+		clauses = parse_where(where)
+		for i in range(len(rows)):
+			for clause in clauses: # TODO: this will need to be changed to support and/or operators
+				if match_where(clause, rows[i]):
+					for field in kwargs:
+						valid_field = False
+						for i in range(len(headers)):
+							if field.lower() == headers[i].column_name.lower():
+								valid_field = True
+						if not valid_field:
+							raise NameError("No field \"" + field + "\" exists on table")
+				else:
+					rows[i] = None
+
+		for i in range(len(rows)):
+			if rows[i] is not None:
+				await raw_rows[i].delete()
 
 		# cleanup
 		if adstore is not None:
