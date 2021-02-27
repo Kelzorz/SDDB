@@ -25,7 +25,7 @@ class DBMS:
 		if isinstance(database_guild, discord.Guild):
 			self.db = database_guild
 		elif isinstance(database_guild, int):
-			self.db = d.get_guild(database_guild)
+			self.db = self.d.get_guild(database_guild)
 			if self.db is None:
 				raise Exception("guild does not exist: " + str(database_guild))
 		else:
@@ -35,24 +35,24 @@ class DBMS:
 
 	def use(self, name):
 		"""Changes the active database"""
-		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
+		if self.violates_str_rules(name) or self.violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed use; illegal character")
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				self.ad = d
-				return True
+				return
 		raise NameError("No database with name")
 
 	async def create_database(self, name):
 		"""Creates a database and sets it to the active database"""
-		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
+		if self.violates_str_rules(name) or self.violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				raise NameError("Database with name already exists")
 		overwrites = {
-		    guild.default_role: discord.PermissionOverwrite(read_messages=False),
-		    guild.me: discord.PermissionOverwrite(read_messages=True)
+		    self.db.default_role: discord.PermissionOverwrite(read_messages=False),
+		    self.db.me: discord.PermissionOverwrite(read_messages=True)
 		    }
 		self.ad = await self.db.create_category(name, overwrites=overwrites ,reason="DBDiscord: New Database")
 		await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Database")
@@ -60,7 +60,7 @@ class DBMS:
 
 	async def drop_database(self, name):
 		"""Drops the database"""
-		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
+		if self.violates_str_rules(name) or self.violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
@@ -70,11 +70,11 @@ class DBMS:
 				return
 		raise NameError("Database with name does not exist")
 
-	async def create_table(self, name, *args):
+	async def create_table(self, name, **kwargs):
 		"""Creates a table on the active database"""
 		if self.ad == None:
 			raise Exception("No active database")
-		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
+		if self.violates_str_rules(name) or self.violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed create; illegal character")
 		if name.lower() == "master":
 			raise NameError("master is a reserved table name")
@@ -82,17 +82,25 @@ class DBMS:
 			raise Exception("Maximum number of tables reached; 1024")
 
 		table_header = ""
-		for i in range(len(args)):
-			if not isinstance(args[i], str):
-				args[i] = str(args[i]) # cast all to string
-			if violates_str_rules(args[i]) or violates_name_rules(args[i]):
+
+		for field in kwargs:
+			if self.violates_str_rules(field) or self.violates_name_rules(field) or field == "" or " " in field:
 				raise TypeError("Malformed create; illegal character")
-			col = args[i].split(" ", 1)
-			if len(col) == 1:
-				col.append("str")
-			if violates_datatype_rules(col[1]):
+			if self.violates_datatype_rules(kwargs[field]):
 				raise TypeError("Malformed create; illegal datatype")
-			table_header = table_header + str(col[0]) + " " + str(col[1]) + chr(0xDB)
+			table_header = table_header + str(field) + " " + str(kwargs[field]) + chr(0xDB)
+
+		# for i in range(len(args)):
+		# 	if not isinstance(args[i], str):
+		# 		args[i] = str(args[i]) # cast all to string
+		# 	if self.violates_str_rules(args[i]) or self.violates_name_rules(args[i]):
+		# 		raise TypeError("Malformed create; illegal character")
+		# 	col = args[i].split(" ", 1)
+		# 	if len(col) == 1:
+		# 		col.append("str")
+		# 	if self.violates_datatype_rules(col[1]):
+		# 		raise TypeError("Malformed create; illegal datatype")
+		# 	table_header = table_header + str(col[0]) + " " + str(col[1]) + chr(0xDB)
 
 		mt = None
 		for t in self.ad.channels:
@@ -101,13 +109,15 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt = t
 		new_table = await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Table")
-		await mt.send(new_table.id + chr(0xDB) + name + chr(0xDB) + table_header)
+		# await mt.send(str(new_table.id) + chr(0xDB) + name + chr(0xDB) + table_header)
+		await mt.send(name + chr(0xDB) + table_header)
+
 
 	async def drop_table(self, name):
 		"""Drops the table on the active database"""
 		if self.ad == None:
 			raise Exception("No active database")
-		if violates_str_rules(name) or violates_name_rules(name) or " " in name:
+		if self.violates_str_rules(name) or self.violates_name_rules(name) or " " in name:
 			raise TypeError("Malformed drop; illegal character")
 		if name.lower() == self.ad.name.lower():
 			raise NameError("Cannot drop table; illegal operation")
@@ -116,12 +126,12 @@ class DBMS:
 		for t in self.ad.channels:
 			if t.name.lower() == name.lower():
 				table = t
-			if t.name.lower() == self.ad.name():
+			if t.name.lower() == self.ad.name.lower():
 				master_table = t
 		if table == None:
 			raise NameError("Table with name does not exist")
-		for record in master_table.history(limit=1024).flatten():
-			if record.content.lower().split(chr(0xDB)[0] == table.name.lower()):
+		for record in await master_table.history(limit=1024).flatten():
+			if record.content.split(chr(0xDB))[0].lower() == table.name.lower():
 				await record.delete()
 				break
 		await table.delete(reason="DBDiscord: Drop Table")
@@ -130,16 +140,16 @@ class DBMS:
 		"""Queries the active database"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
-		if not isinstance(select, str) or not isinstance(against, str) or isinstance(use, str) or isinstance(where, str):
+		if not isinstance(select, str) or not isinstance(against, str) or not isinstance(use, str) or not isinstance(where, str):
 			raise TypeError("Malformed query; unexpected datatype, str only")
-		if violates_str_rules(select, against, where, use):
+		if self.violates_str_rules(select, against, where, use):
 			raise TypeError("Malformed query; illegal character")
 		if select is "":
 			raise NameError("Malformed query; invalid SELECT")
 		if against is "":
 			raise NameError("Malformed query; invalid FROM (AGAINST)")
 
-		adstore = change_ad_pointer(use)
+		adstore = self.change_ad_pointer(use)
 
 		headers = None
 		table = None
@@ -147,8 +157,8 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
-						headers = build_table_headers(record.content)
+					if against.lower() == record.content.split(chr(0xDB))[0]:
+						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -158,17 +168,17 @@ class DBMS:
 		rawrows = await table.history(limit=1024).flatten()
 		full_table = Table(against, headers, rawrows)
 		match_table = Table(against, headers)
-		clauses = parse_where(where)
+		clauses = self.parse_where(where)
 		for row in full_table.rows:
 			for clause in clauses: # TODO: this will need to be changed to support and/or operators
-				if match_where(clause, row):
+				if self.match_where(clause, row):
 					match_table.append(row)
 
 		# MORE CODE GOES HERE?
 
 		# cleanup
 		if adstore is not None:
-			change_ad_pointer(adstore)
+			self.change_ad_pointer(adstore)
 
 		return match_table
 
@@ -178,19 +188,19 @@ class DBMS:
 			raise Exception("No active database")
 		if not isinstance(against, str) or not isinstance(use, str):
 			raise TypeError("Malformed insert; table or use must be a str")
-		if violates_str_rules(against, use) or violates_name_rules(against, use):
+		if self.violates_str_rules(against) or self.violates_name_rules(against):
 			raise TypeError("Malformed insert; illegal character")
 
-		adstore = None
-		change_ad_pointer(use)
+		adstore = self.change_ad_pointer(use)
 
 		table = None
+		headers = None
 		for t in self.ad.channels:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
-						headers = build_table_headers(record.content)
+					if against.lower() == record.content.split(chr(0xDB))[0].lower():
+						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -214,7 +224,7 @@ class DBMS:
 
 		# cleanup
 		if adstore is not None:
-			change_ad_pointer(adstore)
+			self.change_ad_pointer(adstore)
 
 	async def update(self, against, where="", use="", **kwargs):
 		"""Update a row in a table"""
@@ -222,11 +232,10 @@ class DBMS:
 			raise Exception("No active database")
 		if not isinstance(against, str) or not isinstance(use, str) or not isinstance(where, str):
 			raise TypeError("Malformed update; table or use must be a str")
-		if violates_str_rules(against, use, where) or violates_name_rules(against, use):
+		if self.violates_str_rules(against, use, where) or self.violates_name_rules(against):
 			raise TypeError("Malformed update; illegal character")
 
-		adstore = None
-		change_ad_pointer(use)
+		adstore = self.change_ad_pointer(use)
 
 		table = None
 		headers = None
@@ -234,8 +243,8 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
-						headers = build_table_headers(record.content)
+					if against.lower() == record.content.split(chr(0xDB))[0]:
+						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -249,19 +258,21 @@ class DBMS:
 		rows = []
 		for raw in raw_rows:
 			tr = TableRow(headers)
-			for data in raw_rows.content.split(chr(0xDB)):
-				tr.append_record(data)
+			split_rows = raw.content.split(chr(0xDB))
+			del split_rows[len(split_rows)-1]
+			for i in range(len(split_rows)):
+				tr.update_record(i, split_rows[i])
 			rows.append(tr)
 		
-		clauses = parse_where(where)
+		clauses = self.parse_where(where)
 		for i in range(len(rows)):
 			for clause in clauses: # TODO: this will need to be changed to support and/or operators
-				if match_where(clause, rows[i]):
+				if self.match_where(clause, rows[i]):
 					for field in kwargs:
 						valid_field = False
-						for i in range(len(headers)):
-							if field.lower() == headers[i].column_name.lower():
-								rows[i].update_record(i, kwargs[field])
+						for x in range(len(headers)):
+							if field.lower() == headers[x].column_name.lower():
+								rows[i].update_record(x, kwargs[field])
 								valid_field = True
 						if not valid_field:
 							raise NameError("No field \"" + field + "\" exists on table")
@@ -270,31 +281,32 @@ class DBMS:
 
 		for i in range(len(rows)):
 			if rows[i] is not None:
+				#print(str(rows[i])) #
 				await raw_rows[i].edit(content=str(rows[i]))
 
 		# cleanup
 		if adstore is not None:
-			change_ad_pointer(adstore)
+			self.change_ad_pointer(adstore)
 
-	async def delete(self, against, where, use=""):
+	async def delete(self, against, where="", use=""):
 		"""Delete row(s) in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
 			raise Exception("No active database")
 		if not isinstance(against, str) or not isinstance(use, str) or not isinstance(where, str):
 			raise TypeError("Malformed delete; table or use must be a str")
-		if violates_str_rules(against, use, where) or violates_name_rules(against, use):
+		if self.violates_str_rules(against, use, where) or self.violates_name_rules(against):
 			raise TypeError("Malformed delete; illegal character")
 
-		adstore = None
-		change_ad_pointer(use)
+		adstore = self.change_ad_pointer(use)
 
 		table = None
+		headers = None
 		for t in self.ad.channels:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if self.ad.name.lower() == record.content.split(chr(0xDB))[2]:
-						headers = build_table_headers(record.content)
+					if against.lower() == record.content.split(chr(0xDB))[0]:
+						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -306,21 +318,17 @@ class DBMS:
 		rows = []
 		for raw in raw_rows:
 			tr = TableRow(headers)
-			for data in raw_rows.content.split(chr(0xDB)):
-				tr.append_record(data)
+			split_rows = raw.content.split(chr(0xDB))
+			del split_rows[len(split_rows)-1]
+			for i in range(len(split_rows)):
+				tr.update_record(i, split_rows[i])
 			rows.append(tr)
 		
-		clauses = parse_where(where)
+		clauses = self.parse_where(where)
 		for i in range(len(rows)):
 			for clause in clauses: # TODO: this will need to be changed to support and/or operators
-				if match_where(clause, rows[i]):
-					for field in kwargs:
-						valid_field = False
-						for i in range(len(headers)):
-							if field.lower() == headers[i].column_name.lower():
-								valid_field = True
-						if not valid_field:
-							raise NameError("No field \"" + field + "\" exists on table")
+				if self.match_where(clause, rows[i]):
+					pass # match found, leave for deletion
 				else:
 					rows[i] = None
 
@@ -330,75 +338,65 @@ class DBMS:
 
 		# cleanup
 		if adstore is not None:
-			change_ad_pointer(adstore)
-		pass
+			self.change_ad_pointer(adstore)
 
 	# UTILS #
 
-	class Clause:
-		"""Wrapper for where clause"""
-		class OPTYPE(Enum):
-			EQ = 0
-			NOT = 1
-			LESS = 2
-			GREATER = 3
-			LESSEQ = 4
-			GREATEREQ = 5
-
-		def __init__(self, field, optype, value):
-			self.field = field
-			self.optype = optype
-			self.value = value
-
 	def match_where(self, clause, row):
 		"""Checks if a row matches a where clause"""
-		if not isinstance(clause, list):
-			raise TypeError("where clause must be list of Clause")
+		if not isinstance(clause, Clause):
+			raise TypeError("where clause must be an instance of Clause")
 		if not isinstance(row, TableRow):
 			raise TypeError("row must be an instance of TableRow")
-		if not isinstance(clause, Clause):
-			raise TypeError("where clause must be list of Clause")
-			for i in range(len(row.headers)):
-				if clause.field.lower() == row.headers[i].column_name.lower():
-					if row.headers[i].datatype == "str":
-						if clause.optype == LESS or clause.optype == GREATER or clause.optype == LESSEQ or clause.optype == GREATEREQ:
-							raise TypeError("Malformed where clause; cannot preform numerical comparison operation on string")
-					if row.headers[i].datatype == "int":
-						clause.value = int(clause.value)
-					if row.headers[i].datatype == "float":
-						clause.value = float(clause.value)
-					if row.headers[i].datatype == "date":
-						clause.value = datetime.strptime(clause.value)
+		if clause.field is None:
+			return True # always match an empty clause
+		for i in range(len(row.headers)):
+			if clause.field.lower() == row.headers[i].column_name.lower():
+				if row.headers[i].datatype == "str":
+					if clause.optype == OPTYPE.LESS or clause.optype == OPTYPE.GREATER or clause.optype == OPTYPE.LESSEQ or clause.optype == OPTYPE.GREATEREQ:
+						raise TypeError("Malformed where clause; cannot preform numerical comparison operation on string")
+				if row.headers[i].datatype == "int":
+					clause.value = int(clause.value)
+					row.records[i].data = int(row.records[i].data)
+				if row.headers[i].datatype == "float":
+					clause.value = float(clause.value)
+					row.records[i].data = float(row.records[i].data)
+				if row.headers[i].datatype == "date":
+					clause.value = datetime.strptime(clause.value)
+					row.records[i].data = datetime.strptime(row.records[i].data)
 
-					if clause.optype == EQ:
-						if clause.value == row.records[i].data:
-							return True
-						return False
-					if clause.optype == NOT:
-						if clause.value != row.records[i].data:
-							return True
-						return False
-					if clause.optype == LESS:
-						if clause.value < row.records[i].data:
-							return True
-						return False
-					if clause.optype == GREATER:
-						if clause.value > row.records[i].data:
-							return True
-						return False
-					if clause.optype == LESSEQ:
-						if clause.value <= row.records[i].data:
-							return True
-						return False
-					if clause.optype == GREATEREQ:
-						if clause.value >= row.records[i].data:
-							return True
-						return False
+				if clause.optype == OPTYPE.EQ:
+					if row.records[i].data == clause.value:
+						return True
+					return False
+				if clause.optype == OPTYPE.NOT:
+					if row.records[i].data != clause.value:
+						return True
+					return False
+				if clause.optype == OPTYPE.LESS:
+					if row.records[i].data < clause.value:
+						return True
+					return False
+				if clause.optype == OPTYPE.GREATER:
+					if row.records[i].data > clause.value:
+						return True
+					return False
+				if clause.optype == OPTYPE.LESSEQ:
+					if row.records[i].data <= clause.value:
+						return True
+					return False
+				if clause.optype == OPTYPE.GREATEREQ:
+					if row.records[i].data >= rclause.value:
+						return True
+					return False
 
 	def parse_where(self, clause):
 		"""Returns a list of Clause"""
 		if not isinstance(clause, str):
 			raise TypeError("where clause must be a str")
+
+		if clause == "":
+			return [Clause(None, None, None)]
 
 		sc = re.split(">=|=>", clause, maxsplit=1)
 		if len(sc) > 1:
@@ -463,17 +461,19 @@ class DBMS:
 		for checkstr in args:
 			if not isinstance(checkstr, str):
 				raise TypeError("Argument must be a str")
-			if any(legals == checkstr.lower() for legals in ["str", "num", "date", "int", "float"]):
+			if any(legals == checkstr.lower() for legals in ["str", "int", "float", "date"]):
 				valids += 1
-			if valids == len(args):
-				return True
-		return False
+		if valids == len(args):
+			return False
+		return True
 
 	def build_table_headers(self, stream):
 		arr = stream.split(chr(0xDB))
 		headers = []
 		for i in range(len(arr)):
-			headers.append(TableHeader(arr[i]))
+			if i != 0:
+				headers.append(TableHeader(arr[i]))
+		del headers[len(headers)-1] # Excess header
 		return headers
 
 	def change_ad_pointer(self, use):
@@ -481,7 +481,7 @@ class DBMS:
 		if use != "": # change ad pointer for this operation
 			for d in self.db.categories:
 				if d.name.lower() == use.lower():
-					adstore = self.ad
+					adstore = self.ad.name
 					self.ad = d
 					break
 			if adstore == None:
@@ -491,8 +491,24 @@ class DBMS:
 
 class DATATYPE(Enum): # TODO: use this instead of strings
 	STR = 0
-	NUM = 1
-	DATE = 2
+	INT = 1
+	FLOAT = 2
+	DATE = 3
+
+class OPTYPE(Enum):
+	EQ = 0
+	NOT = 1
+	LESS = 2
+	GREATER = 3
+	LESSEQ = 4
+	GREATEREQ = 5
+
+class Clause:
+	"""Wrapper for where clause"""
+	def __init__(self, field, optype, value):
+		self.field = field
+		self.optype = optype
+		self.value = value
 
 class TableHeader:
 	def __init__(self, hstr, pk=False):
@@ -522,6 +538,7 @@ class Table:
 			rs += header.column_name + " " + header.datatype + chr(0xDB)
 		for row in self.rows:
 			rs += "\n" + str(row)
+		return rs
 
 	def append(self, row):
 		if not isinstance(row, TableRow):
@@ -533,7 +550,8 @@ class TableRow:
 		self.headers = headers
 		self.records = []
 		if records is not None:
-			records_raw = records.split(chr(0xDB))
+			records_raw = records.content.split(chr(0xDB))
+			del records_raw[len(records_raw)-1]
 			if not len(records_raw) == len(self.headers):
 				raise Exception("Number of records do not match expected headers")
 			for i in range(len(self.headers)):
@@ -563,7 +581,7 @@ class TableRow:
 			raise IndexError("index out of bounds")
 		if self.headers[index].is_primary_key == True:
 			raise Exception("Cannot update primary key")
-		self.records[index] = TableRecord(headers[index], data.strip())
+		self.records[index] = TableRecord(self.headers[index], data.strip())
 
 class TableRecord:
 	def __init__(self, datatype, data):
@@ -576,4 +594,4 @@ class TableRecord:
 		elif datatype == "float":
 			self.data = float(data)
 		elif datatype == "date":
-			self.data = datetime(data)
+			self.data = datetime.strptime(data)
