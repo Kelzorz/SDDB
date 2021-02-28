@@ -4,14 +4,14 @@ from enum import Enum
 from datetime import datetime
 
 # DBDiscord uses a Discord guild as a ghetto database and supports simple DB operations - create, select, update, delete.
-# The █ character (0xDB) is used as a global delimiter, and is not allowed under any circumstances.
+# The │ character ASCII(0x2502) is used as a global delimiter, and is not allowed under any circumstances.
 # A database is identified as a channel category in the Discord guild.
 # - Databases can have multiple tables
 # - Each Database has a master table that maps fields for each table in th database
 # A table is identified as a text channel in the Discord guild.
-# - Tables have columns as defined by it's record in the master table delimitated by the 0xDB character.
+# - Tables have columns as defined by it's record in the master table delimitated by the 0x2502 character.
 # A row is identified as a text message in a text channel in the Discord guild.
-# - Row columns are delimitated by the 0xDB character.
+# - Row columns are delimitated by the 0x2502 character.
 # - Primary key is the message id.
 # "from" is a Python keyword and cannot be used as a variable, "against" is used instead for SQL-like syntax.
 
@@ -88,19 +88,7 @@ class DBMS:
 				raise TypeError("Malformed create; illegal character")
 			if self.violates_datatype_rules(kwargs[field]):
 				raise TypeError("Malformed create; illegal datatype")
-			table_header = table_header + str(field) + " " + str(kwargs[field]) + chr(0xDB)
-
-		# for i in range(len(args)):
-		# 	if not isinstance(args[i], str):
-		# 		args[i] = str(args[i]) # cast all to string
-		# 	if self.violates_str_rules(args[i]) or self.violates_name_rules(args[i]):
-		# 		raise TypeError("Malformed create; illegal character")
-		# 	col = args[i].split(" ", 1)
-		# 	if len(col) == 1:
-		# 		col.append("str")
-		# 	if self.violates_datatype_rules(col[1]):
-		# 		raise TypeError("Malformed create; illegal datatype")
-		# 	table_header = table_header + str(col[0]) + " " + str(col[1]) + chr(0xDB)
+			table_header = table_header + str(field) + " " + str(kwargs[field]) + chr(0x2502)
 
 		mt = None
 		for t in self.ad.channels:
@@ -109,8 +97,8 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt = t
 		new_table = await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Table")
-		# await mt.send(str(new_table.id) + chr(0xDB) + name + chr(0xDB) + table_header)
-		await mt.send(name + chr(0xDB) + table_header)
+		# await mt.send(str(new_table.id) + chr(0x2502) + name + chr(0x2502) + table_header)
+		await mt.send(name + chr(0x2502) + table_header)
 
 
 	async def drop_table(self, name):
@@ -131,7 +119,7 @@ class DBMS:
 		if table == None:
 			raise NameError("Table with name does not exist")
 		for record in await master_table.history(limit=1024).flatten():
-			if record.content.split(chr(0xDB))[0].lower() == table.name.lower():
+			if record.content.split(chr(0x2502))[0].lower() == table.name.lower():
 				await record.delete()
 				break
 		await table.delete(reason="DBDiscord: Drop Table")
@@ -147,7 +135,7 @@ class DBMS:
 		if select is "":
 			raise NameError("Malformed query; invalid SELECT")
 		if against is "":
-			raise NameError("Malformed query; invalid FROM (AGAINST)")
+			raise NameError("Malformed query; invalid AGAINST (FROM)")
 
 		adstore = self.change_ad_pointer(use)
 
@@ -157,13 +145,30 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if against.lower() == record.content.split(chr(0xDB))[0]:
+					if against.lower() == record.content.split(chr(0x2502))[0]:
 						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
 				table = t
 		if table == None:
 			raise NameError("No table with name: " + against)
+
+		# validate select
+		selected_cols = []
+		if select != "*":
+			selectables = select.split(",")
+			for i in range(len(selectables)):
+				selectables[i] = selectables[i].strip()
+				selectables[i] = selectables[i].lower()
+			for i in range(len(headers)):
+				if headers[i].column_name.lower() in selectables:
+					selected_cols.append(i)
+					selectables.remove(headers[i].column_name.lower())
+			if len(selectables) > 0:
+				invalid_selected = ""
+				for s in selectables:
+					invalid_selected += " " + s
+				raise Exception("Malformed query; selected columns not in table headers," + invalid_selected)
 
 		rawrows = await table.history(limit=1024).flatten()
 		full_table = Table(against, headers, rawrows)
@@ -174,7 +179,19 @@ class DBMS:
 				if self.match_where(clause, row):
 					match_table.append(row)
 
-		# MORE CODE GOES HERE?
+		# build the selected table
+		if len(selected_cols) != 0:
+			selected_headers = []
+			selected_rows = []
+			for i in selected_cols:
+				selected_headers.append(match_table.headers[i])
+			for row in match_table.rows:
+				selected_records = []
+				for i in range(len(row.records)):
+					if i in selected_cols:
+						selected_records.append(row.records[i])
+				selected_rows.append(TableRow(selected_headers, table_records=selected_records))
+			match_table = Table(against, selected_headers, table_rows=selected_rows)
 
 		# cleanup
 		if adstore is not None:
@@ -199,7 +216,7 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if against.lower() == record.content.split(chr(0xDB))[0].lower():
+					if against.lower() == record.content.split(chr(0x2502))[0].lower():
 						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
@@ -243,7 +260,7 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if against.lower() == record.content.split(chr(0xDB))[0]:
+					if against.lower() == record.content.split(chr(0x2502))[0]:
 						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
@@ -258,7 +275,7 @@ class DBMS:
 		rows = []
 		for raw in raw_rows:
 			tr = TableRow(headers)
-			split_rows = raw.content.split(chr(0xDB))
+			split_rows = raw.content.split(chr(0x2502))
 			del split_rows[len(split_rows)-1]
 			for i in range(len(split_rows)):
 				tr.update_record(i, split_rows[i])
@@ -305,7 +322,7 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
-					if against.lower() == record.content.split(chr(0xDB))[0]:
+					if against.lower() == record.content.split(chr(0x2502))[0]:
 						headers = self.build_table_headers(record.content)
 						break
 			if t.name.lower() == against.lower():
@@ -318,7 +335,7 @@ class DBMS:
 		rows = []
 		for raw in raw_rows:
 			tr = TableRow(headers)
-			split_rows = raw.content.split(chr(0xDB))
+			split_rows = raw.content.split(chr(0x2502))
 			del split_rows[len(split_rows)-1]
 			for i in range(len(split_rows)):
 				tr.update_record(i, split_rows[i])
@@ -441,7 +458,7 @@ class DBMS:
 		for checkstr in args:
 			if not isinstance(checkstr, str):
 				raise TypeError("Argument must be a str")
-			if any(illegals in checkstr for illegals in [chr(0xDB)]):
+			if any(illegals in checkstr for illegals in [chr(0x2502)]):
 				return True
 		return False
 
@@ -468,7 +485,7 @@ class DBMS:
 		return True
 
 	def build_table_headers(self, stream):
-		arr = stream.split(chr(0xDB))
+		arr = stream.split(chr(0x2502))
 		headers = []
 		for i in range(len(arr)):
 			if i != 0:
@@ -521,21 +538,24 @@ class TableHeader:
 		self.is_primary_key = pk
 
 class Table:
-	def __init__(self, table_name, headers, rows=None):
+	def __init__(self, table_name, headers, rows=None, table_rows=None):
 		self.table_name = table_name
 		self.headers = headers
 		self.rows = []
 		if rows is not None:
 			for row in rows:
 				self.rows.append(TableRow(headers, row))
+		elif table_rows is not None:
+			for row in table_rows:
+				self.rows.append(row)
 
 	def __len__(self):
 		return len(self.headers)
 
 	def __str__(self):
-		rs = "table_name: " + self.table_name + "\n\n"
+		rs = "table_name: " + self.table_name + "\n"
 		for header in self.headers:
-			rs += header.column_name + " " + header.datatype + chr(0xDB)
+			rs += header.column_name + " " + header.datatype + chr(0x2502)
 		for row in self.rows:
 			rs += "\n" + str(row)
 		return rs
@@ -546,16 +566,21 @@ class Table:
 		self.rows.append(row)
 
 class TableRow:
-	def __init__(self, headers, records=None):
+	def __init__(self, headers, records=None, table_records=None):
 		self.headers = headers
 		self.records = []
 		if records is not None:
-			records_raw = records.content.split(chr(0xDB))
+			records_raw = records.content.split(chr(0x2502))
 			del records_raw[len(records_raw)-1]
 			if not len(records_raw) == len(self.headers):
 				raise Exception("Number of records do not match expected headers")
 			for i in range(len(self.headers)):
 				self.records.append(TableRecord(self.headers[i], records_raw[i]))
+		elif table_records is not None:
+			if not len(table_records) == len(self.headers):
+				raise Exception("Number of records do not match expected headers")
+			for i in range(len(self.headers)):
+				self.records.append(table_records[i])
 		else:
 			for i in range(len(self.headers)):
 				self.records.append(TableRecord(self.headers[i], "NULL"))
@@ -566,7 +591,7 @@ class TableRow:
 	def __str__(self):
 		rs = ""
 		for record in self.records:
-			rs += str(record.data) + chr(0xDB)
+			rs += str(record.data) + chr(0x2502)
 		return rs
 
 	def append_record(self, data):
