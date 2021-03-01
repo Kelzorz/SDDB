@@ -7,7 +7,7 @@ from datetime import datetime
 # The │ character ASCII(0x2502) is used as a global delimiter, and is not allowed under any circumstances.
 # A database is identified as a channel category in the Discord guild.
 # - Databases can have multiple tables
-# - Each Database has a master table that maps fields for each table in th database
+# - Each Database has a master table that maps fields for each table in the database
 # A table is identified as a text channel in the Discord guild.
 # - Tables have columns as defined by it's record in the master table delimitated by the 0x2502 character.
 # A row is identified as a text message in a text channel in the Discord guild.
@@ -70,6 +70,29 @@ class DBMS:
 				return
 		raise NameError("Database with name does not exist")
 
+	async def alter_database(self, name):
+		"""Alters the database"""
+		if self.violates_str_rules(name) or self.violates_name_rules(name) or " " in name:
+			raise TypeError("Malformed alter; illegal character")
+		if self.ad == None or (self.ad == None and use == ""):
+			raise Exception("No active database")
+
+		for d in self.db.categories:
+			if d.name.lower() == name.lower():
+				raise NameError("Database with name already exists")
+		for d in self.db.categories:
+			if d.name.lower() == self.ad.name.lower():
+				master_table = None
+				for t in self.ad.channels:
+					if t.name.lower() == name.lower():
+						raise NameError("Table exists with name, rename offending table and try again")
+					if t.name.lower() == self.ad.name.lower():
+						master_table = t
+				await master_table.edit(name=name, reason="DBDiscord: Alter Database")
+				await d.edit(name=name, reason="DBDiscord: Alter Database")
+				self.ad = d # update the database pointer as it may have changed
+				break
+
 	async def create_table(self, name, **kwargs):
 		"""Creates a table on the active database"""
 		if self.ad == None:
@@ -78,6 +101,8 @@ class DBMS:
 			raise TypeError("Malformed create; illegal character")
 		if name.lower() == "master":
 			raise NameError("master is a reserved table name")
+		if self.ad.name.lower() == name.lower():
+				raise NameError("Table cannot have same name as parent database")
 		if len(self.ad.channels) == 1024:
 			raise Exception("Maximum number of tables reached; 1024")
 
@@ -123,6 +148,102 @@ class DBMS:
 				await record.delete()
 				break
 		await table.delete(reason="DBDiscord: Drop Table")
+
+	async def alter_table(self, name, add="", drop="", modify="", rename=""):
+		"""Alters a table on the active database"""
+		if self.ad == None:
+			raise Exception("No active database")
+		if self.violates_str_rules(name, drop, rename) or self.violates_name_rules(name):
+			raise NameError("Malformed alter; illegal character")
+		if name.lower() == self.ad.name.lower():
+			raise NameError("Cannot alter master table")
+
+		headers = None
+		table = None
+		header_row = None
+		for t in self.ad.channels:
+			if t.name.lower() == self.ad.name.lower():
+				mt_records = await t.history(limit=1024).flatten()
+				for record in mt_records:
+					if name.lower() == record.content.split(chr(0x2502))[0]:
+						headers = self.build_table_headers(record.content)
+						header_row = record
+						break
+			if t.name.lower() == name.lower():
+				table = t
+		if table == None:
+			raise NameError("No table with name: " + name)
+
+		# add
+		if add != "":
+			new_col = add.split(" ", 1)
+			if self.violates_name_rules(new_col[0]):
+				raise NameError("Malformed alter; illegal character")
+			if self.violates_datatype_rules(new_col[1]):
+				raise TypeError("Malformed alter; illegal datatype")
+			await header_row.edit(content=header_row.content + new_col[0] + " " + new_col[1] + chr(0x2502))
+			for row in await table.history(limit=1024).flatten():
+				await row.edit(content=row.content + "NULL" + chr(0x2502))
+
+		# drop
+		if drop != "":
+			if self.violates_name_rules(drop):
+				raise NameError("Malformed alter; illegal character")
+			column_exists = False
+			for i in range(len(headers)):
+				if headers[i].column_name.lower() == drop.lower():
+					column_exists = True
+					fractured_header = header_row.content.split(chr(0x2502))
+					rebuilt_header = ""
+					for x in range(len(fractured_header)):
+						if x-1 != i:
+							rebuilt_header += fractured_header[x] + chr(0x2502)
+					await header_row.edit(content=rebuilt_header[:-1])
+					for row in await table.history(limit=1024).flatten():
+						fractured_row = row.content.split(chr(0x2502))
+						rebuilt_row = ""
+						for x in range(len(fractured_row)):
+							if x != i:
+								rebuilt_row += fractured_row[x] + chr(0x2502)
+						await row.edit(content=rebuilt_row[:-1])
+			if not column_exists:
+				raise NameError("No column with name " + drop)
+
+		# modify
+		if modify != "":
+			if self.violates_name_rules(modify):
+				raise NameError("Malformed alter; illegal character")
+			mod_col = modify.split(" ", 2)
+			if self.violates_name_rules(mod_col[1]):
+				raise NameError("Malformed alter; illegal character")
+			if self.violates_datatype_rules(mod_col[2]):
+				raise TypeError("Malformed alter; illegal datatype")
+			header_exits = False
+			for header in headers:
+				if header.column_name.lower() == mod_col[0].lower():
+					header_exits = True
+					break
+			if header_exits:
+				fractured_header = header_row.content.split(mod_col[0], 1)
+				fractured_header[1] = chr(0x2502) + fractured_header[1].split(chr(0x2502), 1)[1]
+				await header_row.edit(content=fractured_header[0] + mod_col[1] + " " + mod_col[2] + fractured_header[1])
+			else:
+				raise NameError("No column with name " + mod_col[0])
+
+		# rename
+		if rename != "":
+			if self.ad.name.lower() == rename.lower():
+				raise NameError("Table cannot have same name as parent database")
+			for t in self.ad.channels:
+				if t.name.lower() == rename.lower():
+					raise NameError("Table with name already exists")
+			new_headers = ""
+			for header in header_row.content.split(chr(0x2502)):
+				if header.lower() == name.lower():
+					header = rename
+				new_headers += header + chr(0x2502)
+			await header_row.edit(content=new_headers)
+			await table.edit(name=rename, reason="DBDiscord: Alter Table")
 
 	async def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
@@ -292,7 +413,7 @@ class DBMS:
 								rows[i].update_record(x, kwargs[field])
 								valid_field = True
 						if not valid_field:
-							raise NameError("No field \"" + field + "\" exists on table")
+							raise NameError("No field '" + field + "'' exists on table")
 				else:
 					rows[i] = None
 
@@ -457,7 +578,7 @@ class DBMS:
 	def violates_str_rules(self, *args):
 		for checkstr in args:
 			if not isinstance(checkstr, str):
-				raise TypeError("Argument must be a str")
+				raise TypeError("Malformed statement; argument not a string")
 			if any(illegals in checkstr for illegals in [chr(0x2502)]):
 				return True
 		return False
@@ -465,11 +586,11 @@ class DBMS:
 	def violates_name_rules(self, *args):
 		for checkstr in args:
 			if not isinstance(checkstr, str):
-				raise TypeError("Argument must be a str")
-			if not checkstr.isalnum():
-				return True
+				raise TypeError("Malformed statement; argument not a string")
 			for substr in checkstr.split(" "):
-				if any(illegals in substr.lower() for illegals in ["select", "from", "against", "where", "use", "create", "drop", "delete", "and", "or", "in"]):
+				if not substr.isalnum():
+					return True
+				if any(illegals == substr.lower() for illegals in ["select", "from", "against", "where", "use", "create", "alter", "drop", "delete", "and", "or", "in"]):
 					return True
 		return False
 
