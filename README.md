@@ -177,7 +177,7 @@ Appends a TableRecord to records[]
 * `update_record(index, data)`
 Changes the data in a TableRecord at records[index]
 
-###TableRecord
+### TableRecord
 A wrapper for a record (cell) in a table
 
 #### Properties
@@ -218,6 +218,7 @@ String of comparison value
 
 ### DATATYPE
 An enumeration of supported datatypes (not currently used)
+
 	STR = 0
 	INT = 1
 	FLOAT = 2
@@ -225,6 +226,7 @@ An enumeration of supported datatypes (not currently used)
 
 ### OPTYPE
 An enumeration of supported WHERE operators
+
 	EQ = 0
 	NOT = 1
 	LESS = 2
