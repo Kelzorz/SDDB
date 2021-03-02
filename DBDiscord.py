@@ -272,6 +272,8 @@ class DBMS:
 			if t.name.lower() == against.lower():
 				table = t
 		if table == None:
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise NameError("No table with name: " + against)
 
 		# validate select
@@ -289,6 +291,8 @@ class DBMS:
 				invalid_selected = ""
 				for s in selectables:
 					invalid_selected += " " + s
+				if adstore is not None:
+					self.change_ad_pointer(adstore)
 				raise Exception("Malformed query; selected columns not in table headers," + invalid_selected)
 
 		rawrows = await table.history(limit=1024).flatten()
@@ -343,10 +347,16 @@ class DBMS:
 			if t.name.lower() == against.lower():
 				table = t
 		if table == None:
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise NameError("No table with name: " + against)
 		if len(kwargs) > len(headers):
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise Exception("Number of columns exceeds table definition")
 		if len(await table.history(limit=1024).flatten()) == 1024:
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise Exception("Maximum number of records reached; 1024")
 
 		new_row = TableRow(headers)
@@ -357,6 +367,8 @@ class DBMS:
 					new_row.update_record(i, kwargs[field])
 					valid_field = True
 			if not valid_field:
+				if adstore is not None:
+					self.change_ad_pointer(adstore)
 				raise NameError("No field \"" + field + "\" exists on table")
 		await table.send(str(new_row))
 
@@ -387,8 +399,12 @@ class DBMS:
 			if t.name.lower() == against.lower():
 				table = t
 		if table == None:
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise NameError("No table with name: " + against)
 		if len(kwargs) > len(headers):
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise Exception("Number of columns exceeds table definition")
 
 		# generate row objects from raw
@@ -413,6 +429,8 @@ class DBMS:
 								rows[i].update_record(x, kwargs[field])
 								valid_field = True
 						if not valid_field:
+							if adstore is not None:
+								self.change_ad_pointer(adstore)
 							raise NameError("No field '" + field + "'' exists on table")
 				else:
 					rows[i] = None
@@ -449,6 +467,8 @@ class DBMS:
 			if t.name.lower() == against.lower():
 				table = t
 		if table == None:
+			if adstore is not None:
+				self.change_ad_pointer(adstore)
 			raise NameError("No table with name: " + against)
 
 		# generate row objects from raw
