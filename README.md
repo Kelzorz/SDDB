@@ -1,5 +1,5 @@
 # DBDiscord
-Using Discord As A Simple Database
+Using discord as a simple database
 
 ## I'll take "not technically against the TOS" for 500, Alex
 DBDiscord is the latest in a long linage of using things as databases that were never designed to be used as databases.  Mooching off someone else's existing publicly available storage capacity so that you don't have to stand up your own private storage.  Implementations of this concept can be done anywhere raw text can be uploaded, viewed, edited, and deleted.  DBDiscord implements this using a Discord guild (commonly called a server) and unlike most platforms does not violate the terms of service, which can be verified [here](https://discord.com/terms).
@@ -150,7 +150,7 @@ Returns number of columns in table
 Returns a string representation of the table
 
 * `append(row)`
-Adds a row to the table
+Appends a TableRow to rows
 
 ### TableRow
 A wrapper for a row in a table
@@ -172,7 +172,7 @@ Returns the number of columns in row
 Returns a string representation of the row
 
 * `append_record(data)`
-Appends a TableRecord to records[]
+Appends a TableRecord to records
 
 * `update_record(index, data)`
 Changes the data in a TableRecord at records[index]
@@ -190,6 +190,9 @@ Variable type data held in the record (cell)
 * `__init__(datatype, data)`
 Constructor for the TableRecord wrapper
 
+* `__str__()`
+Returns a string representation of the record
+
 ### TableHeader
 A wrapper for the TableHeader
 
@@ -204,6 +207,9 @@ Boolean for primary key
 #### Methods
 * `__init__(hstr, pk=False)`
 Constructor for the TableHeader wrapper
+
+* `__str__()`
+Returns a string representation of the header
 
 ### Clause
 A wrapper for WHERE clauses
@@ -234,4 +240,4 @@ An enumeration of supported WHERE operators
 	LESSEQ = 4
 	GREATEREQ = 5
 
-Maybe more coming soon (¯\\_(ツ)_/¯)...
+Maybe more coming soon ¯\\_(ツ)_/¯...
