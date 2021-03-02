@@ -1,5 +1,5 @@
 # DBDiscord
-Using discord as a simple database
+Using Discord as a simple database
 
 ## I'll take "not technically against the TOS" for 500, Alex
 DBDiscord is the latest in a long linage of using things as databases that were never designed to be used as databases.  Mooching off someone else's existing publicly available storage capacity so that you don't have to stand up your own private storage.  Implementations of this concept can be done anywhere raw text can be uploaded, viewed, edited, and deleted.  DBDiscord implements this using a Discord guild (commonly called a server) and unlike most platforms does not violate the terms of service, which can be verified [here](https://discord.com/terms).
