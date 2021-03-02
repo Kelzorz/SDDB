@@ -67,6 +67,7 @@ class DBMS:
 				for t in d.channels:
 					await t.delete(reason="DBDiscord: Drop Database")
 				await d.delete(reason="DBDiscord: Drop Database")
+				self.ad = None
 				return
 		raise NameError("Database with name does not exist")
 
@@ -122,7 +123,6 @@ class DBMS:
 			if t.name.lower() == self.ad.name.lower():
 				mt = t
 		new_table = await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Table")
-		# await mt.send(str(new_table.id) + chr(0x2502) + name + chr(0x2502) + table_header)
 		await mt.send(name + chr(0x2502) + table_header)
 
 
@@ -242,7 +242,7 @@ class DBMS:
 				if header.lower() == name.lower():
 					header = rename
 				new_headers += header + chr(0x2502)
-			await header_row.edit(content=new_headers)
+			await header_row.edit(content=new_headers[:-1])
 			await table.edit(name=rename, reason="DBDiscord: Alter Table")
 
 	async def query(self, select="*", against="", where="", use=""):
@@ -658,6 +658,9 @@ class TableHeader:
 			pass
 		self.is_primary_key = pk
 
+	def __str__():
+		return self.column_name + " " + self.datatype
+
 class Table:
 	def __init__(self, table_name, headers, rows=None, table_rows=None):
 		self.table_name = table_name
@@ -741,3 +744,6 @@ class TableRecord:
 			self.data = float(data)
 		elif datatype == "date":
 			self.data = datetime.strptime(data)
+
+	def __str__():
+		return str(self.data)
