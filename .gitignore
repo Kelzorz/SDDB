@@ -1,3 +1,9 @@
+# Python package folders
+build
+dist
+Kelzorz.egg-info
+
+# Test files
 *.ini
 *.log
 __pycache__
