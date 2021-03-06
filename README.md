@@ -1,17 +1,17 @@
-# DBDiscord
+# Simple Discord Database
 Using Discord as a simple database
 
 ## I'll take "not technically against the TOS" for 500, Alex
-DBDiscord is the latest in a long linage of using things as databases that were never designed to be used as databases.  Mooching off someone else's existing publicly available storage capacity so that you don't have to stand up your own private storage.  Implementations of this concept can be done anywhere raw text can be uploaded, viewed, edited, and deleted.  DBDiscord implements this using a Discord guild (commonly called a server) and unlike most platforms does not violate the terms of service, which can be verified [here](https://discord.com/terms).
+SDDB is the latest in a long linage of using things as databases that were never designed to be used as databases.  Mooching off someone else's existing publicly available storage capacity so that you don't have to stand up your own private storage.  Implementations of this concept can be done anywhere raw text can be uploaded, viewed, edited, and deleted.  SDDB implements this using a Discord guild (commonly called a server) and unlike most platforms does not violate the terms of service, which can be verified [here](https://discord.com/terms).
 
 ## Use Cases
-DBDiscord was written to fulfill a very specific use case where I need to support my Discord chatbot's ever expanding scope creep without storing data locally; as it is hosted on grandma's old laptop with no battery life from 2007 that came in a box that looked like a cow and has a "certified Windows Vista" sticker on it.  As such DBDiscord was designed for light intensity persistent data storage through unexpected restarts and inevitable hardware failures.
+SDDB was written to fulfill a very specific use case where I need to support my Discord chatbot's ever expanding scope creep without storing data locally; as it is hosted on grandma's old laptop with no battery life from 2007 that came in a box that looked like a cow and has a "certified Windows Vista" sticker on it.  As such SDDB was designed for light intensity persistent data storage through unexpected restarts and inevitable hardware failures.
 
-DBDiscord exists in a niche for small to medium size applications that already connect or interact with Discord and have a need for infrequently accessed persistent data storage, such as configuration or personalization settings.  These applications can take advantage of Discord's existing capacity to store data therefore avoiding the need to stand up their own infrastructure.  DBDiscord uses the Discord API through Rapptz [Discord.py](https://github.com/Rapptz/discord.py) package and is subject to API rate limiters.  Therefore any application that would frequently hit the database will endure performance degradation globally across Discord.  Additionally any application with requirements exceeding the limitations below have long outgrown DBDiscord's usefulness and should probably stand up a proper database.
+SDDB exists in a niche for small to medium size applications that already connect or interact with Discord and have a need for infrequently accessed persistent data storage, such as configuration or personalization settings.  These applications can take advantage of Discord's existing capacity to store data therefore avoiding the need to stand up their own infrastructure.  SDDB uses the Discord API through Rapptz [Discord.py](https://github.com/Rapptz/discord.py) package and is subject to API rate limiters.  Therefore any application that would frequently hit the database will endure performance degradation globally across Discord.  Additionally any application with requirements exceeding the limitations below have long outgrown SDDB's usefulness and should probably stand up a proper database.
 
 ## Limitations
-* DBDiscord uses the Discord API and is subject to it's API rate limiters.
-* The Discord account using DBDiscord needs administrator permissions on the server used as a database.
+* SDDB uses the Discord API and is subject to it's API rate limiters.
+* The Discord account using SDDB needs administrator permissions on the server used as a database.
 * Database, table and column names only support alphanumeric characters.
 * The delimiter character 0x2502 is not allowed under any circumstances.
 * There is a limit of 1024 tables per database.
@@ -21,7 +21,7 @@ DBDiscord exists in a niche for small to medium size applications that already c
 * Only four datatypes are currently supported, strings, integers, floats, and dates.
 * Database metadata is not cached and requires an API call (this is for my personal use case with limited memory but might be changed in the future as caching will reduce total API calls to Discord).
 * Does not support multiple WHERE clauses, only one WHERE clause is allowed (multiple WHERE clauses coming soon, maybe).
-* Data is stored in plaintext and is not encrypted, **do not store sensitive data with DBDiscord** (coming soon, maybe).
+* Data is stored in plaintext and is not encrypted, **do not store sensitive data with SDDB** (coming soon, maybe).
 
 ## Requirements
 * Python 3.5.3 or higher
@@ -29,13 +29,13 @@ DBDiscord exists in a niche for small to medium size applications that already c
 
 ## Quickstart
 
-DBDiscord's database management system needs to be initialized with the client instance from Rapptz [Discord.py](https://github.com/Rapptz/discord.py) and the guild_id of the Discord server to be used as a database.
+SDDB's database management system needs to be initialized with the client instance from Rapptz [Discord.py](https://github.com/Rapptz/discord.py) and the guild_id of the Discord server to be used as a database.
 ```python
 import discord
-import DBDiscord
+import SDDB
 
 client = discord.Client(intents = discord.Intents.all())
-dbms = DBDiscord.DBMS(client, 000000000000000) # replace 0's with guild id
+dbms = SDDB.DBMS(client, 000000000000000) # replace 0's with guild id
 ```
 Once the DBMS has been initialized we need to create a database.
 ```python
@@ -61,7 +61,7 @@ await dbms.delete(against="person", where="lastname = Freeman") # bye bye Morgan
 
 ## Documentation
 
-DBDiscord was written in an attempt to retain SQL-Like syntax in a pythonic environment.  Arguments are named and passed so as to mimic SQL syntax inside function calls. SQL keywords such as alter, select, where, and so on function as you would expect them to with the exception of 'from' which is a python reserved word and has been replaced with 'against' but otherwise functions the same as SQL 'from'.  Where appropriate, variably unknown fields are taken as \*\*kwargs.  With this in mind the SQL statement
+SDDB was written in an attempt to retain SQL-Like syntax in a pythonic environment.  Arguments are named and passed so as to mimic SQL syntax inside function calls. SQL keywords such as alter, select, where, and so on function as you would expect them to with the exception of 'from' which is a python reserved word and has been replaced with 'against' but otherwise functions the same as SQL 'from'.  Where appropriate, variably unknown fields are taken as \*\*kwargs.  With this in mind the SQL statement
 ```sql
 SELECT firstname, lastname, age FROM person WHERE lastname = "Smith"
 ```
@@ -78,7 +78,7 @@ would be written as
 create_table("person", firstname="str", lastname="str", age="int")
 ```
 
-Below are the classes with their properties and methods included in DBDiscord.
+Below are the classes with their properties and methods included in SDDB.
 
 ### DBMS
 Database Management System, main class for interacting with a database on Discord.
