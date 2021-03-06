@@ -10,7 +10,7 @@ with open("README.md") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="DBDiscord",
+    name="DatabaseDiscord",
     version="0.0.1",
     author="Kelzorz",
     author_email="43789359+Kelzorz@users.noreply.github.com",
@@ -18,9 +18,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     license=license,
-    url="https://github.com/Kelzorz/DBDiscord",
+    url="https://github.com/Kelzorz/DatabaseDiscord",
     project_urls={
-        "Issue tracker" : "https://github.com/Kelzorz/DBDiscord/issues",
+        "Issue tracker" : "https://github.com/Kelzorz/DatabaseDiscord/issues",
     },
     classifiers=[
         "Programming Language :: Python :: 3"
@@ -30,6 +30,6 @@ setuptools.setup(
         "Topic :: Database",
     ],
     install_requires=requirements,
-    packages=["DBDiscord"],
+    packages=["DatabaseDiscord"],
     python_requires=">=3.5.3"
 )
