@@ -1,26 +1,27 @@
 import setuptools
 
-with open("requirements.txt") as fh:
+with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
-with open("LICENSE") as fh:
+with open("LICENSE", "r", encoding="utf-8") as fh:
     license = fh.read()
 
-with open("README.md") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="DatabaseDiscord",
-    version="0.0.1",
+    name="SDDB",
+    version="0.0.2",
     author="Kelzorz",
     author_email="43789359+Kelzorz@users.noreply.github.com",
-    description="Using Discord as a simple database",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
+    # description="Using Discord as a simple database",
+    # description_content_type="text/markdown",
+    # long_description=long_description,
+    # long_description_content_type="text/markdown",
     license=license,
-    url="https://github.com/Kelzorz/DatabaseDiscord",
+    url="https://github.com/Kelzorz/SDDB",
     project_urls={
-        "Issue tracker" : "https://github.com/Kelzorz/DatabaseDiscord/issues",
+        "Issue tracker" : "https://github.com/Kelzorz/SDDB/issues",
     },
     classifiers=[
         "Programming Language :: Python :: 3"
@@ -30,6 +31,6 @@ setuptools.setup(
         "Topic :: Database",
     ],
     install_requires=requirements,
-    packages=["DatabaseDiscord"],
+    packages=["SDDB"],
     python_requires=">=3.5.3"
 )

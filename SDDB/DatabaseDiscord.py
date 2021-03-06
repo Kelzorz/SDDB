@@ -3,7 +3,7 @@ import re
 from enum import Enum
 from datetime import datetime
 
-# DBDiscord uses a Discord guild as a ghetto database and supports simple DB operations - create, select, update, delete.
+# SDDB uses a Discord guild as a ghetto database and supports simple DB operations - create, select, update, delete.
 # The │ character ASCII(0x2502) is used as a global delimiter, and is not allowed under any circumstances.
 # A database is identified as a channel category in the Discord guild.
 # - Databases can have multiple tables
@@ -54,8 +54,8 @@ class DBMS:
 		    self.db.default_role: discord.PermissionOverwrite(read_messages=False),
 		    self.db.me: discord.PermissionOverwrite(read_messages=True)
 		    }
-		self.ad = await self.db.create_category(name, overwrites=overwrites ,reason="DBDiscord: New Database")
-		await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Database")
+		self.ad = await self.db.create_category(name, overwrites=overwrites ,reason="SDDB: New Database")
+		await self.db.create_text_channel(name, category=self.ad, reason="SDDB: New Database")
 		return
 
 	async def drop_database(self, name):
@@ -65,8 +65,8 @@ class DBMS:
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				for t in d.channels:
-					await t.delete(reason="DBDiscord: Drop Database")
-				await d.delete(reason="DBDiscord: Drop Database")
+					await t.delete(reason="SDDB: Drop Database")
+				await d.delete(reason="SDDB: Drop Database")
 				self.ad = None
 				return
 		raise NameError("Database with name does not exist")
@@ -89,8 +89,8 @@ class DBMS:
 						raise NameError("Table exists with name, rename offending table and try again")
 					if t.name.lower() == self.ad.name.lower():
 						master_table = t
-				await master_table.edit(name=name, reason="DBDiscord: Alter Database")
-				await d.edit(name=name, reason="DBDiscord: Alter Database")
+				await master_table.edit(name=name, reason="SDDB: Alter Database")
+				await d.edit(name=name, reason="SDDB: Alter Database")
 				self.ad = d # update the database pointer as it may have changed
 				break
 
@@ -122,7 +122,7 @@ class DBMS:
 				raise NameError("Table with name already exists")
 			if t.name.lower() == self.ad.name.lower():
 				mt = t
-		new_table = await self.db.create_text_channel(name, category=self.ad, reason="DBDiscord: New Table")
+		new_table = await self.db.create_text_channel(name, category=self.ad, reason="SDDB: New Table")
 		await mt.send(name + chr(0x2502) + table_header)
 
 
@@ -147,7 +147,7 @@ class DBMS:
 			if record.content.split(chr(0x2502))[0].lower() == table.name.lower():
 				await record.delete()
 				break
-		await table.delete(reason="DBDiscord: Drop Table")
+		await table.delete(reason="SDDB: Drop Table")
 
 	async def alter_table(self, name, add="", drop="", modify="", rename=""):
 		"""Alters a table on the active database"""
@@ -243,7 +243,7 @@ class DBMS:
 					header = rename
 				new_headers += header + chr(0x2502)
 			await header_row.edit(content=new_headers[:-1])
-			await table.edit(name=rename, reason="DBDiscord: Alter Table")
+			await table.edit(name=rename, reason="SDDB: Alter Table")
 
 	async def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
