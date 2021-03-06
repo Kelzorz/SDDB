@@ -1,7 +1,7 @@
 # Python package folders
 build
 dist
-Kelzorz.egg-info
+DBDiscord.egg-info
 
 # Test files
 *.ini
