@@ -1,7 +1,7 @@
 # Python package folders
 build
 dist
-DatabaseDiscord.egg-info
+SDDB.egg-info
 
 # Test files
 *.ini
