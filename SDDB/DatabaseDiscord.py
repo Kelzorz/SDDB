@@ -40,7 +40,7 @@ class DBMS:
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				self.ad = d
-				return
+				return True
 		raise NameError("No database with name")
 
 	async def create_database(self, name):
@@ -56,7 +56,7 @@ class DBMS:
 		    }
 		self.ad = await self.db.create_category(name, overwrites=overwrites ,reason="SDDB: New Database")
 		await self.db.create_text_channel(name, category=self.ad, reason="SDDB: New Database")
-		return
+		return True
 
 	async def drop_database(self, name):
 		"""Drops the database"""
@@ -68,7 +68,7 @@ class DBMS:
 					await t.delete(reason="SDDB: Drop Database")
 				await d.delete(reason="SDDB: Drop Database")
 				self.ad = None
-				return
+				return True
 		raise NameError("Database with name does not exist")
 
 	async def alter_database(self, name):
@@ -92,7 +92,7 @@ class DBMS:
 				await master_table.edit(name=name, reason="SDDB: Alter Database")
 				await d.edit(name=name, reason="SDDB: Alter Database")
 				self.ad = d # update the database pointer as it may have changed
-				break
+				return True
 
 	async def create_table(self, name, **kwargs):
 		"""Creates a table on the active database"""
@@ -124,7 +124,7 @@ class DBMS:
 				mt = t
 		new_table = await self.db.create_text_channel(name, category=self.ad, reason="SDDB: New Table")
 		await mt.send(name + chr(0x2502) + table_header)
-
+		return True
 
 	async def drop_table(self, name):
 		"""Drops the table on the active database"""
@@ -148,6 +148,7 @@ class DBMS:
 				await record.delete()
 				break
 		await table.delete(reason="SDDB: Drop Table")
+		return True
 
 	async def alter_table(self, name, add="", drop="", modify="", rename=""):
 		"""Alters a table on the active database"""
@@ -157,6 +158,8 @@ class DBMS:
 			raise NameError("Malformed alter; illegal character")
 		if name.lower() == self.ad.name.lower():
 			raise NameError("Cannot alter master table")
+
+		successful = False
 
 		headers = None
 		table = None
@@ -184,6 +187,7 @@ class DBMS:
 			await header_row.edit(content=header_row.content + new_col[0] + " " + new_col[1] + chr(0x2502))
 			for row in await table.history(limit=1024).flatten():
 				await row.edit(content=row.content + "" + chr(0x2502))
+			successful = True
 
 		# drop
 		if drop != "":
@@ -206,6 +210,7 @@ class DBMS:
 							if x != i:
 								rebuilt_row += fractured_row[x] + chr(0x2502)
 						await row.edit(content=rebuilt_row[:-1])
+					successful = True
 			if not column_exists:
 				raise NameError("No column with name " + drop)
 
@@ -227,6 +232,7 @@ class DBMS:
 				fractured_header = header_row.content.split(mod_col[0], 1)
 				fractured_header[1] = chr(0x2502) + fractured_header[1].split(chr(0x2502), 1)[1]
 				await header_row.edit(content=fractured_header[0] + mod_col[1] + " " + mod_col[2] + fractured_header[1])
+				successful = True
 			else:
 				raise NameError("No column with name " + mod_col[0])
 
@@ -244,6 +250,11 @@ class DBMS:
 				new_headers += header + chr(0x2502)
 			await header_row.edit(content=new_headers[:-1])
 			await table.edit(name=rename, reason="SDDB: Alter Table")
+			successful = True
+
+		if successful:
+			return True
+		return False
 
 	async def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
@@ -376,6 +387,8 @@ class DBMS:
 		if adstore is not None:
 			self.change_ad_pointer(adstore)
 
+		return True
+
 	async def update(self, against, where="", use="", **kwargs):
 		"""Update a row in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
@@ -444,6 +457,8 @@ class DBMS:
 		if adstore is not None:
 			self.change_ad_pointer(adstore)
 
+		return True
+
 	async def delete(self, against, where="", use=""):
 		"""Delete row(s) in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
@@ -490,13 +505,19 @@ class DBMS:
 				else:
 					rows[i] = None
 
+		successful = False
 		for i in range(len(rows)):
 			if rows[i] is not None:
 				await raw_rows[i].delete()
+				successful = True
 
 		# cleanup
 		if adstore is not None:
 			self.change_ad_pointer(adstore)
+
+		if successful:
+			return True
+		return False
 
 	# UTILS #
 
