@@ -17,7 +17,7 @@ SDDB exists in a niche for small to medium size applications that already connec
 * There is a limit of 1024 tables per database.
 * There is a limit of 1024 rows per table.
 * There is a hard limit of 2000 characters of data per row spread across all columns.
-* NULL data is stored as the string 'NULL'.
+* NULL data is stored as an empty string.
 * Only four datatypes are currently supported, strings, integers, floats, and dates.
 * Database metadata is not cached and requires an API call (this is for my personal use case with limited memory but might be changed in the future as caching will reduce total API calls to Discord).
 * Does not support multiple WHERE clauses, only one WHERE clause is allowed (multiple WHERE clauses coming soon, maybe).

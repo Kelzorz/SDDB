@@ -183,7 +183,7 @@ class DBMS:
 				raise TypeError("Malformed alter; illegal datatype")
 			await header_row.edit(content=header_row.content + new_col[0] + " " + new_col[1] + chr(0x2502))
 			for row in await table.history(limit=1024).flatten():
-				await row.edit(content=row.content + "NULL" + chr(0x2502))
+				await row.edit(content=row.content + "" + chr(0x2502))
 
 		# drop
 		if drop != "":
@@ -727,7 +727,7 @@ class TableRow:
 				self.records.append(table_records[i])
 		else:
 			for i in range(len(self.headers)):
-				self.records.append(TableRecord(self.headers[i], "NULL"))
+				self.records.append(TableRecord(self.headers[i], ""))
 
 	def __len__(self):
 		return len(self.records)
