@@ -29,6 +29,12 @@ SDDB exists in a niche for small to medium size applications that already connec
 
 ## Quickstart
 
+SDDB can be acquired with pip.
+
+```python
+pip install SDDB
+```
+
 SDDB's database management system needs to be initialized with the client instance from Rapptz [Discord.py](https://github.com/Rapptz/discord.py) and the guild_id of the Discord server to be used as a database.
 ```python
 import discord
