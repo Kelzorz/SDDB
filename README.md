@@ -134,6 +134,9 @@ Updates rows in a table matching the where clause in accordance with SQL-like sy
 * `delete(against, where="", use="")`
 Deletes rows in a table matching the where clause in accordance with SQL-like syntax
 
+* `sql(sql)`
+Parses and runs raw SQL against the database (experimental)
+
 ### Table
 A wrapper for the Table
 
