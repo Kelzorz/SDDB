@@ -11,7 +11,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="SDDB",
-    version="0.0.2",
+    version="0.0.3",
     author="Kelzorz",
     author_email="43789359+Kelzorz@users.noreply.github.com",
     # description="Using Discord as a simple database",

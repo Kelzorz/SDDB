@@ -40,7 +40,7 @@ class DBMS:
 		for d in self.db.categories:
 			if d.name.lower() == name.lower():
 				self.ad = d
-				return
+				return True
 		raise NameError("No database with name")
 
 	async def create_database(self, name):
@@ -56,7 +56,7 @@ class DBMS:
 		    }
 		self.ad = await self.db.create_category(name, overwrites=overwrites ,reason="SDDB: New Database")
 		await self.db.create_text_channel(name, category=self.ad, reason="SDDB: New Database")
-		return
+		return True
 
 	async def drop_database(self, name):
 		"""Drops the database"""
@@ -68,7 +68,7 @@ class DBMS:
 					await t.delete(reason="SDDB: Drop Database")
 				await d.delete(reason="SDDB: Drop Database")
 				self.ad = None
-				return
+				return True
 		raise NameError("Database with name does not exist")
 
 	async def alter_database(self, name):
@@ -92,7 +92,7 @@ class DBMS:
 				await master_table.edit(name=name, reason="SDDB: Alter Database")
 				await d.edit(name=name, reason="SDDB: Alter Database")
 				self.ad = d # update the database pointer as it may have changed
-				break
+				return True
 
 	async def create_table(self, name, **kwargs):
 		"""Creates a table on the active database"""
@@ -124,7 +124,7 @@ class DBMS:
 				mt = t
 		new_table = await self.db.create_text_channel(name, category=self.ad, reason="SDDB: New Table")
 		await mt.send(name + chr(0x2502) + table_header)
-
+		return True
 
 	async def drop_table(self, name):
 		"""Drops the table on the active database"""
@@ -148,6 +148,7 @@ class DBMS:
 				await record.delete()
 				break
 		await table.delete(reason="SDDB: Drop Table")
+		return True
 
 	async def alter_table(self, name, add="", drop="", modify="", rename=""):
 		"""Alters a table on the active database"""
@@ -157,6 +158,8 @@ class DBMS:
 			raise NameError("Malformed alter; illegal character")
 		if name.lower() == self.ad.name.lower():
 			raise NameError("Cannot alter master table")
+
+		successful = False
 
 		headers = None
 		table = None
@@ -183,7 +186,8 @@ class DBMS:
 				raise TypeError("Malformed alter; illegal datatype")
 			await header_row.edit(content=header_row.content + new_col[0] + " " + new_col[1] + chr(0x2502))
 			for row in await table.history(limit=1024).flatten():
-				await row.edit(content=row.content + "NULL" + chr(0x2502))
+				await row.edit(content=row.content + "" + chr(0x2502))
+			successful = True
 
 		# drop
 		if drop != "":
@@ -206,6 +210,7 @@ class DBMS:
 							if x != i:
 								rebuilt_row += fractured_row[x] + chr(0x2502)
 						await row.edit(content=rebuilt_row[:-1])
+					successful = True
 			if not column_exists:
 				raise NameError("No column with name " + drop)
 
@@ -227,6 +232,7 @@ class DBMS:
 				fractured_header = header_row.content.split(mod_col[0], 1)
 				fractured_header[1] = chr(0x2502) + fractured_header[1].split(chr(0x2502), 1)[1]
 				await header_row.edit(content=fractured_header[0] + mod_col[1] + " " + mod_col[2] + fractured_header[1])
+				successful = True
 			else:
 				raise NameError("No column with name " + mod_col[0])
 
@@ -244,6 +250,11 @@ class DBMS:
 				new_headers += header + chr(0x2502)
 			await header_row.edit(content=new_headers[:-1])
 			await table.edit(name=rename, reason="SDDB: Alter Table")
+			successful = True
+
+		if successful:
+			return True
+		return False
 
 	async def query(self, select="*", against="", where="", use=""):
 		"""Queries the active database"""
@@ -376,6 +387,8 @@ class DBMS:
 		if adstore is not None:
 			self.change_ad_pointer(adstore)
 
+		return True
+
 	async def update(self, against, where="", use="", **kwargs):
 		"""Update a row in a table"""
 		if self.ad == None or (self.ad == None and use == ""):
@@ -431,7 +444,7 @@ class DBMS:
 						if not valid_field:
 							if adstore is not None:
 								self.change_ad_pointer(adstore)
-							raise NameError("No field '" + field + "'' exists on table")
+							raise NameError("No field '" + field + "' exists on table")
 				else:
 					rows[i] = None
 
@@ -443,6 +456,8 @@ class DBMS:
 		# cleanup
 		if adstore is not None:
 			self.change_ad_pointer(adstore)
+
+		return True
 
 	async def delete(self, against, where="", use=""):
 		"""Delete row(s) in a table"""
@@ -490,13 +505,180 @@ class DBMS:
 				else:
 					rows[i] = None
 
+		successful = False
 		for i in range(len(rows)):
 			if rows[i] is not None:
 				await raw_rows[i].delete()
+				successful = True
 
 		# cleanup
 		if adstore is not None:
 			self.change_ad_pointer(adstore)
+
+		if successful:
+			return True
+		return False
+
+	async def sql(self, sql):
+		if not isinstance(sql, str):
+			raise TypeError("sql must be a str")
+		sql = sql.lower()
+		sql = sql.replace("\n", " ")
+
+		if sql.startswith("use"):
+			return self.use(sql.split(" ", 1)[1])
+
+		if sql.startswith("create database"):
+			return await self.create_database(sql.split(" ", 2)[2])
+
+		if sql.startswith("drop database"):
+			return await self.drop_database(sql.split(" ", 2)[2])
+
+		if sql.startswith("alter database"):
+			return await self.alter_database(sql.split(" ", 2)[2])
+
+		if sql.startswith("create table"):
+			sql = sql.replace("create table ", "", 1)
+			name = sql.split(" ", 1)[0]
+			sql = sql.replace(name + " ", "", 1)
+			sql = sql.replace("(", "")
+			sql = sql.replace(")", "")
+			sql = sql.replace(";", "")
+			sql = sql.replace(", ", ",")
+			kwargs = {}
+			for k in sql.split(","):
+				kwargs[k.split(" ")[0]] = k.split(" ")[1]
+			return await self.create_table(name=name, **kwargs)
+
+		if sql.startswith("drop table"):
+			return await self.drop_table(sql.split(" ", 2)[2])
+
+		if sql.startswith("alter table"):
+			sql = sql.replace("alter table ", "", 1)
+			name = sql.split(" ", 1)[0]
+			sql = sql.replace(name, "", 1)
+			operations = sql.split(",")
+
+			adds, drops, modifys, renames = [], [], [], []
+			for op in operations:
+				if op.startswith(" "):
+					op = op.replace(" ", "", 1)
+				if op.startswith("add column"):
+					adds.append(op.split("add column ", 1)[1])
+				elif op.startswith("add"):
+					adds.append(op.split("add ", 1)[1])
+				elif op.startswith("drop column"):
+					drops.append(op.split("drop column ", 1)[1])
+				elif op.startswith("drop"):
+					drops.append(op.split("drop ", 1)[1])
+				elif op.startswith("modify column"):
+					modifys.append(op.split("modify column ", 1)[1])
+				elif op.startswith("modify"):
+					modifys.append(op.split("modify ", 1)[1])
+				elif op.startswith("rename"):
+					renames.append(op.split("rename ", 1)[1])
+
+			if len(renames) > 1:
+				raise Exception("Malformed modify; too many renames")
+
+			adds_results, drops_results, modifys_results, renames_results = [], [], [], []
+			for add in adds:
+				try:
+					adds_results.append(await self.alter_table(name=name, add=add))
+				except Exception as e:
+					adds_results.append(str(e))
+			for drop in drops:
+				try:
+					drops_results.append(await self.alter_table(name=name, drop=drop))
+				except Exception as e:
+					drops_results.append(str(e))
+			for modify in modifys:
+				try:
+					modifys_results.append(await self.alter_table(name=name, modify=modify))
+				except Exception as e:
+					modifys_results.append(str(e))
+			for rename in renames:
+				try:
+					renames_results.append(await self.alter_table(name=name, rename=rename))
+				except Exception as e:
+					renames_results.append(str(e))
+
+			results_str = ""
+			for i in range(len(adds_results)):
+				results_str += "add column " + adds[i] + ": " + str(adds_results[i])+ "\n"
+			for i in range(len(drops_results)):
+				results_str += "drop column " + drops[i] + ": " + str(drops_results[i])+ "\n"
+			for i in range(len(modifys_results)):
+				results_str += "modify column " + modifys[i] + ": " + str(modifys_results[i])+ "\n"
+			for i in range(len(renames_results)):
+				results_str += "rename " + renames[i] + ": " + str(renames_results[i])+ "\n"
+			return results_str
+
+		if sql.startswith("select"):
+			sql = sql.replace("select ", "", 1)
+			select = ""
+			if " from " in sql:
+				select = sql.split(" from ", 1)[0]
+				sql = sql.split(" from ", 1)[1]
+			elif " against " in sql:
+				select = sql.split(" against ", 1)[0]
+				sql= sql.split(" against ", 1)[1]
+			else:
+				raise NameError("Malformed query; invalid AGAINST (FROM)")
+			sql = sql.replace(select, "", 1)
+			against = sql.split(" where", 1)[0]
+			sql = sql.replace(against, "", 1)
+			sql = sql.replace("where ", "", 1)
+			sql = sql[1:]
+			return await self.query(select=select, against=against, where=sql)
+			
+		if sql.startswith("insert into"):
+			sql = sql.replace("insert into ", "", 1)
+			against = sql.split(" ", 1)[0]
+			sql = sql.replace(against, "", 1)
+			sql = sql.replace("(", "")
+			sql = sql.replace(")", "")
+			sql = sql.replace(";", "")
+			columns = sql.split(" values ")[0]
+			columns = columns.split(",")
+			values = sql.split(" values ")[1]
+			values = values.split(",")
+			kwargs = {}
+			for i in range(len(columns)):
+				kwargs[columns[i].replace(" ", "")] = values[i].replace(" ", "")
+			return await self.insert_into(against=against, **kwargs)
+
+		if sql.startswith("update"):
+			sql = sql.replace("update ", "")
+			against = sql.split(" set ", 1)[0]
+			sql = sql.replace(against + " set ", "", 1)
+			sql = sql.replace(";", "")
+			sets = sql.split(" where ")[0]
+			where = sql.split(" where ")[1]
+			cvs = sets.split(",")
+			kwargs = {}
+			for cv in cvs:
+				column = cv.split("=", 1)[0]
+				column = column.replace(" ", "")
+				value = cv.split("=", 1)[1]
+				if value.startswith(" "):
+					value = value.replace(" ", "")
+				kwargs[column] = value
+			return await self.update(against=against, where=where, **kwargs)
+
+		if sql.startswith("delete"):
+			sql = sql.replace("delete ", "", 1)
+			if "from " in sql:
+				sql = sql.replace("from ", "", 1)
+			elif "against " in sql:
+				sql = sql.replace("against ", "", 1)
+			against = sql.split(" where", 1)[0]
+			sql = sql.replace(against, "", 1)
+			sql = sql.replace("where ", "", 1)
+			sql = sql[1:]
+			return await self.delete(against=against, where=sql)
+
+		raise NameError("invalid sql")
 
 	# UTILS #
 
@@ -727,7 +909,7 @@ class TableRow:
 				self.records.append(table_records[i])
 		else:
 			for i in range(len(self.headers)):
-				self.records.append(TableRecord(self.headers[i], "NULL"))
+				self.records.append(TableRecord(self.headers[i], ""))
 
 	def __len__(self):
 		return len(self.records)
