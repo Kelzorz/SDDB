@@ -4,6 +4,7 @@ dist
 SDDB.egg-info
 
 # Test files
+/tests
 *.ini
 *.log
 __pycache__
