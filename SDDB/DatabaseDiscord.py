@@ -94,6 +94,42 @@ class DBMS:
 				self.ad = d # update the database pointer as it may have changed
 				return True
 
+	async def describe(self, name=None):
+		"""Describe database schema"""
+		match_table = None
+		raw_rows = []
+
+		if name == None:
+
+			for d in self.db.categories:
+				raw_rows.append(d.name)
+			match_table = Table("Schema", self.build_table_headers(d.name + chr(0x2502) + chr(0x176) + chr(0x2502)), rows = raw_rows)
+
+			return match_table
+
+		adstore = self.change_ad_pointer(name)
+
+		for d in self.db.categories:
+			if d.name.lower() == self.ad.name.lower():
+				for t in self.ad.channels:
+					if t.name.lower() == self.ad.name.lower():
+						longest_table = 0
+						for row in await table.history(limit=1024).flatten():
+							table_size = len(row.split(chr(0x2502)))
+							if table_size > longest_table:
+								longest_table = table_size
+							raw_rows.append(row)
+						bsh = name + chr(0x2502) # create some bogus headers
+						for _ in range(longest_table):
+							bsh += chr(0x176) + chr(0x2502)
+						match_table = Table(name, self.build_table_headers(bsh), rows=raw_rows)
+
+		# cleanup
+		if adstore is not None:
+			self.change_ad_pointer(adstore)
+
+		return match_table
+
 	async def create_table(self, name, **kwargs):
 		"""Creates a table on the active database"""
 		if self.ad == None:
