@@ -429,11 +429,9 @@ class DBMS:
 			tr = TableRow(headers)
 			split_rows = raw.content.split(chr(0x2502))
 			del split_rows[len(split_rows)-1]
+			tr.update_record(0, str(raw.id)) # Primary key
 			for i in range(len(split_rows)):
-				if i == 0: # Primary key
-					tr.update_record(i, str(raw.id))
-				else:
-					tr.update_record(i, split_rows[i])
+				tr.update_record(i+1, split_rows[i])
 			rows.append(tr)
 		
 		clauses = self.parse_where(where)
@@ -497,11 +495,9 @@ class DBMS:
 			tr = TableRow(headers)
 			split_rows = raw.content.split(chr(0x2502))
 			del split_rows[len(split_rows)-1]
+			tr.update_record(0, str(raw.id)) # Primary key
 			for i in range(len(split_rows)):
-				if i == 0: # Primary key
-					tr.update_record(i, str(raw.id))
-				else:
-					tr.update_record(i, split_rows[i])
+				tr.update_record(i+1, split_rows[i])
 			rows.append(tr)
 		
 		clauses = self.parse_where(where)
@@ -799,7 +795,7 @@ class DBMS:
 			for substr in checkstr.split(" "):
 				if not substr.isalnum():
 					return True
-				if any(illegals == substr.lower() for illegals in ["select", "from", "against", "where", "use", "create", "alter", "drop", "delete", "and", "or", "in"]):
+				if any(illegals == substr.lower() for illegals in ["select", "from", "against", "where", "use", "create", "alter", "drop", "delete", "and", "or", "in", "id"]):
 					return True
 		return False
 
