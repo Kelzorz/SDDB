@@ -169,7 +169,8 @@ class DBMS:
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
 					if name.lower() == record.content.split(chr(0x2502))[0]:
-						headers = self.build_table_headers(record.content)
+						headers = self.build_table_headers(record)
+						del headers[0] # Don't track id here
 						header_row = record
 						break
 			if t.name.lower() == name.lower():
@@ -278,7 +279,7 @@ class DBMS:
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
 					if against.lower() == record.content.split(chr(0x2502))[0]:
-						headers = self.build_table_headers(record.content)
+						headers = self.build_table_headers(record)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -353,7 +354,8 @@ class DBMS:
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
 					if against.lower() == record.content.split(chr(0x2502))[0].lower():
-						headers = self.build_table_headers(record.content)
+						headers = self.build_table_headers(record)
+						del headers[0] # Don't track id here
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -407,7 +409,7 @@ class DBMS:
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
 					if against.lower() == record.content.split(chr(0x2502))[0]:
-						headers = self.build_table_headers(record.content)
+						headers = self.build_table_headers(record)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -428,7 +430,10 @@ class DBMS:
 			split_rows = raw.content.split(chr(0x2502))
 			del split_rows[len(split_rows)-1]
 			for i in range(len(split_rows)):
-				tr.update_record(i, split_rows[i])
+				if i == 0: # Primary key
+					tr.update_record(i, str(raw.id))
+				else:
+					tr.update_record(i, split_rows[i])
 			rows.append(tr)
 		
 		clauses = self.parse_where(where)
@@ -450,8 +455,7 @@ class DBMS:
 
 		for i in range(len(rows)):
 			if rows[i] is not None:
-				#print(str(rows[i])) #
-				await raw_rows[i].edit(content=str(rows[i]))
+				await raw_rows[i].edit(content=rows[i].writable())
 
 		# cleanup
 		if adstore is not None:
@@ -477,7 +481,7 @@ class DBMS:
 				mt_records = await t.history(limit=1024).flatten()
 				for record in mt_records:
 					if against.lower() == record.content.split(chr(0x2502))[0]:
-						headers = self.build_table_headers(record.content)
+						headers = self.build_table_headers(record)
 						break
 			if t.name.lower() == against.lower():
 				table = t
@@ -494,7 +498,10 @@ class DBMS:
 			split_rows = raw.content.split(chr(0x2502))
 			del split_rows[len(split_rows)-1]
 			for i in range(len(split_rows)):
-				tr.update_record(i, split_rows[i])
+				if i == 0: # Primary key
+					tr.update_record(i, str(raw.id))
+				else:
+					tr.update_record(i, split_rows[i])
 			rows.append(tr)
 		
 		clauses = self.parse_where(where)
@@ -808,8 +815,9 @@ class DBMS:
 		return True
 
 	def build_table_headers(self, stream):
-		arr = stream.split(chr(0x2502))
+		arr = stream.content.split(chr(0x2502))
 		headers = []
+		headers.append(TableHeader("id int", True)) # Message ID = Primary key
 		for i in range(len(arr)):
 			if i != 0:
 				headers.append(TableHeader(arr[i]))
@@ -898,10 +906,13 @@ class TableRow:
 		if records is not None:
 			records_raw = records.content.split(chr(0x2502))
 			del records_raw[len(records_raw)-1]
-			if not len(records_raw) == len(self.headers):
+			if not len(records_raw) + 1 == len(self.headers):
 				raise Exception("Number of records do not match expected headers")
 			for i in range(len(self.headers)):
-				self.records.append(TableRecord(self.headers[i], records_raw[i]))
+				if i == 0: # Primary key
+					self.records.append(TableRecord(self.headers[i], str(records.id)))
+				else:
+					self.records.append(TableRecord(self.headers[i], records_raw[i-1]))
 		elif table_records is not None:
 			if not len(table_records) == len(self.headers):
 				raise Exception("Number of records do not match expected headers")
@@ -910,6 +921,15 @@ class TableRow:
 		else:
 			for i in range(len(self.headers)):
 				self.records.append(TableRecord(self.headers[i], ""))
+
+	def writable(self):
+		"""String of TableRow excluding id for writing to the database"""
+		rs = ""
+		for i in range(len(self.records)):
+			if i == 0:
+				continue
+			rs += str(self.records[i].data) + chr(0x2502)
+		return rs
 
 	def __len__(self):
 		return len(self.records)
@@ -930,8 +950,6 @@ class TableRow:
 			raise TypeError("index must be an int")
 		if index > len(self.headers) or index < 0:
 			raise IndexError("index out of bounds")
-		if self.headers[index].is_primary_key == True:
-			raise Exception("Cannot update primary key")
 		self.records[index] = TableRecord(self.headers[index], data.strip())
 
 class TableRecord:
