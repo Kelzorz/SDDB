@@ -186,6 +186,9 @@ Appends a TableRecord to records
 * `update_record(index, data)`
 Changes the data in a TableRecord at records[index]
 
+* `writable()`
+Returns a string of TableRow excluding the primary key id
+
 ### TableRecord
 A wrapper for a record (cell) in a table
 
