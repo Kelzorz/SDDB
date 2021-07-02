@@ -918,15 +918,6 @@ class TableRow:
 			for i in range(len(self.headers)):
 				self.records.append(TableRecord(self.headers[i], ""))
 
-	def writable(self):
-		"""String of TableRow excluding id for writing to the database"""
-		rs = ""
-		for i in range(len(self.records)):
-			if i == 0:
-				continue
-			rs += str(self.records[i].data) + chr(0x2502)
-		return rs
-
 	def __len__(self):
 		return len(self.records)
 
@@ -947,6 +938,15 @@ class TableRow:
 		if index > len(self.headers) or index < 0:
 			raise IndexError("index out of bounds")
 		self.records[index] = TableRecord(self.headers[index], data.strip())
+
+	def writable(self):
+		"""String of TableRow excluding id for writing to the database"""
+		rs = ""
+		for i in range(len(self.records)):
+			if i == 0:
+				continue
+			rs += str(self.records[i].data) + chr(0x2502)
+		return rs
 
 class TableRecord:
 	def __init__(self, datatype, data):
